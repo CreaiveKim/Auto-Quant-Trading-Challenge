@@ -24,7 +24,7 @@ Dockerized: 전체 시스템을 컨테이너화하여 환경에 구애받지 않
 
 Failure Analysis: 모델의 예측값과 실제 체결 데이터를 비교 분석하여 매매 로직의 오차를 추적하는 로깅 시스템.
 
-Roles (Collaborators)
+Roles (Collaborators)\
 LOKI 
 
 - 데이터 아키텍처 설계 및 MySQL 데이터베이스 최적화 (SQL 적용).

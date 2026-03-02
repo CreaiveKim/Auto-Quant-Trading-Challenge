@@ -2,442 +2,387 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import React, { useMemo, useState } from "react";
+import { auth } from "@/lib/firebase";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 
-const ICON = {
-  logo: "/images/logo1.png",
-  search: "/icons/icon9.png",
-  edit: "/icons/icon6.png",
-  settings: "/icons/icon7.png",
-  bell: "/icons/icon8.png",
-  // sidebar icons
-  dashboard: "/icons/icon1.png",
-  markets: "/icons/icon2.png",
-  live: "/icons/icon3.png",
-  signals: "/icons/icon4.png",
-  support: "/icons/icon5.png",
-  // mobile bottom icons
-  home: "/icons/icon13.png",
-} as const;
+export default function LandingPage() {
+  const router = useRouter();
 
-type SideItem = {
-  key: string;
-  label: string;
-  icon: string;
-};
+  const [mode, setMode] = useState<"none" | "signin" | "signup">("none");
+  const [isLoading, setIsLoading] = useState(false);
 
-const SIDE_ITEMS: SideItem[] = [
-  { key: "dashboard", label: "Dashboard", icon: ICON.dashboard },
-  { key: "markets", label: "Markets", icon: ICON.markets },
-  { key: "live", label: "Live Trading", icon: ICON.live },
-  { key: "signals", label: "Signals", icon: ICON.signals },
-  { key: "support", label: "Support", icon: ICON.support },
-];
+  // sign in
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
 
-const MOBILE_ITEMS: SideItem[] = [
-  { key: "home", label: "Home", icon: ICON.home },
-  { key: "dashboard", label: "Dashboard", icon: ICON.dashboard },
-  { key: "live", label: "Live Trading", icon: ICON.live },
-  { key: "signals", label: "Signals", icon: ICON.signals },
-  { key: "settings", label: "Settings", icon: ICON.settings },
-];
+  // sign up
+  const [signUpEmail, setSignUpEmail] = useState("");
+  const [signUpPassword, setSignUpPassword] = useState("");
+  const [signUpPassword2, setSignUpPassword2] = useState("");
+  const [agreedTos, setAgreedTos] = useState(false);
 
-function IconButton({
-  iconSrc,
-  alt,
-  className = "",
-}: {
-  iconSrc: string;
-  alt: string;
-  className?: string;
-}) {
-  return (
-    <button
-      className={`h-9 w-9 cursor-pointer rounded-lg border border-slate-700/70 bg-slate-900/40 hover:bg-slate-900/70 active:scale-[0.98] transition flex items-center justify-center ${className}`}
-      type="button"
-    >
-      <Image src={iconSrc} alt={alt} width={18} height={18} />
-    </button>
-  );
-}
+  // ✅ 이메일 검증 상태 (중복체크는 "가입 시도 결과"로 판별)
+  const [emailCheckStatus, setEmailCheckStatus] = useState<
+    "idle" | "checking" | "available" | "taken" | "invalid"
+  >("idle");
 
-function SidebarDesktop() {
-  return (
-    <aside className="h-screen w-56 shrink-0 border-r border-slate-800/70 bg-[#0C1624]">
-      {/* Logo area */}
-      <div className="h-18 px-4 flex items-center gap-3 border-b border-slate-800/70">
-        <button type="button" className="flex items-center cursor-pointer">
-          <Image src={ICON.logo} alt="2KQuant" width={180} height={0} />
-        </button>
-      </div>
+  const year = useMemo(() => new Date().getFullYear(), []);
 
-      {/* Menu */}
-      <nav className="p-3 space-y-2">
-        {SIDE_ITEMS.map((it) => (
-          <button
-            key={it.key}
-            type="button"
-            className="w-full cursor-pointer flex items-center gap-3 rounded-xl px-3 py-8 text-left border border-transparent hover:border-slate-700/50 hover:bg-slate-900/30 transition"
-          >
-            <Image src={it.icon} alt={it.label} width={22} height={22} />
-            <span className="text-slate-200/90">{it.label}</span>
-          </button>
-        ))}
-      </nav>
-    </aside>
-  );
-}
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
 
-function BottomNavMobile() {
-  const pathname =
-    typeof window !== "undefined" ? window.location.pathname : "/";
+  // ✅ 사전 체크는 "형식"만
+  const checkEmailFormatOnly = (emailRaw: string) => {
+    const email = emailRaw.trim().toLowerCase();
 
-  const isActive = (key: string) => {
-    if (key === "home") return pathname === "/";
-    return pathname.includes(key);
+    if (!email) {
+      setEmailCheckStatus("idle");
+      return { ok: false, reason: "empty" as const };
+    }
+
+    if (!isValidEmail(email)) {
+      setEmailCheckStatus("invalid");
+      return { ok: false, reason: "invalid" as const };
+    }
+
+    setEmailCheckStatus("available"); // "형식상 가능" 의미
+    return { ok: true, reason: "format_ok" as const };
+  };
+
+  const parseAuthError = (code?: string) => {
+    switch (code) {
+      case "auth/invalid-email":
+        return "이메일 형식이 올바르지 않습니다.";
+      case "auth/user-not-found":
+        return "해당 이메일로 가입된 계정을 찾을 수 없습니다.";
+      case "auth/wrong-password":
+        return "비밀번호가 올바르지 않습니다.";
+      case "auth/invalid-credential":
+        return "이메일 또는 비밀번호가 올바르지 않습니다.";
+      case "auth/email-already-in-use":
+        return "이미 가입된 이메일입니다.";
+      case "auth/weak-password":
+        return "비밀번호가 너무 약합니다. 6자 이상으로 설정해 주세요.";
+      case "auth/too-many-requests":
+        return "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.";
+      case "auth/operation-not-allowed":
+        return "현재 로그인 방식이 비활성화되어 있습니다. (Firebase 콘솔에서 Email/Password 로그인을 활성화해 주세요.)";
+      case "auth/network-request-failed":
+        return "네트워크 요청에 실패했습니다. 인터넷 연결 또는 보안 설정을 확인해 주세요.";
+      case "auth/invalid-api-key":
+        return "Firebase API Key가 올바르지 않습니다. 환경변수(.env.local) 설정을 확인해 주세요.";
+      case "auth/app-not-authorized":
+        return "현재 도메인이 Firebase에서 허용되지 않았습니다. (Authorized domains에 localhost 또는 배포 도메인을 추가해 주세요.)";
+      default:
+        return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+  };
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) return;
+
+    if (!signInEmail.trim() || !signInPassword.trim()) {
+      window.alert("이메일과 비밀번호를 입력해 주세요.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      await signInWithEmailAndPassword(auth, signInEmail, signInPassword);
+
+      window.alert("로그인되었습니다.");
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error("FIREBASE_AUTH_ERROR:", err?.code, err?.message, err);
+      window.alert(parseAuthError(err?.code));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) return;
+
+    if (
+      !signUpEmail.trim() ||
+      !signUpPassword.trim() ||
+      !signUpPassword2.trim()
+    ) {
+      window.alert("이메일, 비밀번호, 비밀번호 확인을 모두 입력해 주세요.");
+      return;
+    }
+
+    const formatCheck = checkEmailFormatOnly(signUpEmail);
+    if (!formatCheck.ok) {
+      window.alert("이메일 형식이 올바르지 않습니다.");
+      return;
+    }
+
+    if (signUpPassword !== signUpPassword2) {
+      window.alert(
+        "비밀번호와 비밀번호 확인이 일치하지 않습니다. 다시 확인해 주세요.",
+      );
+      return;
+    }
+
+    if (!agreedTos) {
+      window.alert("이용약관에 동의하셔야 가입하실 수 있습니다.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setEmailCheckStatus("checking");
+
+      await createUserWithEmailAndPassword(auth, signUpEmail, signUpPassword);
+
+      setEmailCheckStatus("available");
+      window.alert("회원가입이 완료되었습니다. 이제 로그인해 주세요.");
+
+      setMode("signin");
+      setSignInEmail(signUpEmail);
+      setSignInPassword("");
+      setSignUpPassword("");
+      setSignUpPassword2("");
+      setAgreedTos(false);
+    } catch (err: any) {
+      console.error("FIREBASE_AUTH_ERROR:", err?.code, err?.message, err);
+
+      if (err?.code === "auth/email-already-in-use")
+        setEmailCheckStatus("taken");
+      else if (err?.code === "auth/invalid-email")
+        setEmailCheckStatus("invalid");
+      else setEmailCheckStatus("idle");
+
+      window.alert(parseAuthError(err?.code));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="fixed bottom-4 left-0 right-0 z-50 md:hidden px-3">
-      <div
-        className="
-          mx-auto w-full max-w-md
-          rounded-[28px]
-          border-2 border-slate-700/70
-          bg-[#0B1420]/95
-          backdrop-blur-xl
-          shadow-[0_14px_48px_rgba(0,0,0,0.55)]
-        "
-      >
-        <div className="p-2">
-          <div className="grid grid-cols-5 gap-1">
-            {MOBILE_ITEMS.map((it) => {
-              const active = isActive(it.key);
+    <div className="min-h-screen bg-[#0B1420] flex flex-col items-center justify-center text-white px-4">
+      {/* Logo */}
+      <div className="mb-8">
+        <Image
+          src="/images/logo1.png"
+          alt="2K Quant"
+          width={220}
+          height={60}
+          priority
+        />
+      </div>
 
-              return (
-                <button
-                  key={it.key}
-                  type="button"
-                  className="
-                    relative
-                    flex flex-col items-center justify-center gap-1
-                    rounded-2xl
-                    py-2
-                    cursor-pointer
-                    transition
-                    hover:bg-slate-900/40
-                  "
-                >
-                  {active && (
-                    <span
-                      className="
-                        pointer-events-none
-                        absolute
-                        top-2
-                        h-12 w-12
-                        rounded-full
-                        bg-slate-200/25
-                        blur-lg
-                      "
-                    />
-                  )}
+      {/* Panel */}
+      <div className="w-full max-w-sm rounded-2xl border border-slate-800/70 bg-[#0F1A2A]/70 p-5 shadow-[0_14px_48px_rgba(0,0,0,0.35)]">
+        {/* Buttons */}
+        <div className="space-y-3">
+          <button
+            onClick={() => setMode((m) => (m === "signin" ? "none" : "signin"))}
+            className="h-11 w-full rounded-xl border border-sky-400/40 bg-sky-500/20 hover:bg-sky-500/30 hover:border-sky-400/60 transition text-sky-200 font-semibold"
+            disabled={isLoading}
+            type="button"
+          >
+            로그인
+          </button>
 
-                  <span className="relative z-10">
-                    <Image
-                      src={it.icon}
-                      alt={it.label}
-                      width={32}
-                      height={32}
-                    />
+          <button
+            onClick={() => setMode((m) => (m === "signup" ? "none" : "signup"))}
+            className="h-11 w-full rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 hover:border-emerald-400/45 transition text-sm font-semibold disabled:opacity-60"
+            disabled={isLoading}
+            type="button"
+          >
+            회원가입
+          </button>
+        </div>
+
+        {/* Sign in Form */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ${
+            mode === "signin"
+              ? "max-h-[340px] opacity-100 mt-4"
+              : "max-h-0 opacity-0"
+          }`}
+        >
+          <form onSubmit={handleSignIn} className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                이메일
+              </label>
+              <input
+                value={signInEmail}
+                onChange={(e) => setSignInEmail(e.target.value)}
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none placeholder:text-slate-600 focus:border-slate-600/80"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                비밀번호
+              </label>
+              <input
+                value={signInPassword}
+                onChange={(e) => setSignInPassword(e.target.value)}
+                type="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none placeholder:text-slate-600 focus:border-slate-600/80"
+                disabled={isLoading}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="h-11 w-full rounded-xl border border-sky-400/30 bg-sky-500/15 text-sky-200 hover:bg-sky-500/25 hover:border-sky-400/45 transition text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {isLoading && (
+                <span className="h-4 w-4 rounded-full border-2 border-slate-200/40 border-t-transparent animate-spin" />
+              )}
+              {isLoading ? "로그인 처리 중..." : "로그인 확인"}
+            </button>
+          </form>
+        </div>
+
+        {/* Sign up Form */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ${
+            mode === "signup"
+              ? "max-h-[700px] opacity-100 mt-4"
+              : "max-h-0 opacity-0"
+          }`}
+        >
+          <form onSubmit={handleSignUp} className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                이메일
+              </label>
+
+              <input
+                value={signUpEmail}
+                onChange={(e) => {
+                  setSignUpEmail(e.target.value);
+                  setEmailCheckStatus("idle");
+                }}
+                onBlur={() => checkEmailFormatOnly(signUpEmail)}
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none placeholder:text-slate-600 focus:border-slate-600/80"
+                disabled={isLoading}
+              />
+
+              <div className="mt-1 text-xs">
+                {emailCheckStatus === "checking" && (
+                  <span className="text-slate-400">가입 시도 중...</span>
+                )}
+                {emailCheckStatus === "available" && (
+                  <span className="text-emerald-300">
+                    이메일 형식이 정상입니다. 가입 시 중복 여부가 확인됩니다.
                   </span>
-
-                  <span
-                    className={`relative z-10 text-[11px] ${
-                      active ? "text-white" : "text-slate-300"
-                    }`}
-                  >
-                    {it.label}
+                )}
+                {emailCheckStatus === "taken" && (
+                  <span className="text-rose-300">
+                    이미 가입된 이메일입니다.
                   </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatPill({
-  dot = true,
-  label,
-  value,
-  valueClass = "text-slate-200",
-}: {
-  dot?: boolean;
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      {dot && <span className="h-2.5 w-2.5 rounded-full bg-green-400" />}
-      <span className="text-slate-400">{label}:</span>
-      <span className={valueClass}>{value}</span>
-    </div>
-  );
-}
-
-function Card({
-  title,
-  children,
-  rightDots = false,
-  className = "",
-}: {
-  title: string;
-  children: React.ReactNode;
-  rightDots?: boolean;
-  className?: string;
-}) {
-  return (
-    <section
-      className={`rounded-xl border border-slate-800/70 bg-[#0F1A2A]/80 overflow-hidden ${className}`}
-    >
-      <div className="h-11 px-4 flex items-center justify-between border-b border-slate-800/70">
-        <div className="text-slate-300/90 font-medium">{title}</div>
-        {rightDots && (
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-slate-300/40" />
-            <span className="h-2.5 w-2.5 rounded-full bg-slate-300/40" />
-            <span className="h-2.5 w-2.5 rounded-full bg-slate-300/40" />
-          </div>
-        )}
-      </div>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  valueClass = "text-slate-100",
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-800/70 bg-[#0F1A2A]/80 overflow-hidden">
-      <div className="h-11 px-4 flex items-center border-b border-slate-800/70">
-        <div className="text-slate-400 text-sm">{label}</div>
-      </div>
-      <div className="p-4 flex items-center justify-between">
-        <div className={`text-2xl font-semibold ${valueClass}`}>{value}</div>
-        {/* 우측 작은 차트 자리(이미지로 교체 가능) */}
-        <div className="h-7 w-16 rounded-md bg-slate-900/40 border border-slate-700/40 flex items-center justify-center text-[10px] text-slate-500">
-          mini
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function Page() {
-  return (
-    <div className="min-h-screen bg-[#0B1420] text-white">
-      <div className="flex">
-        {/* Desktop Sidebar */}
-        <div className="hidden md:block">
-          <SidebarDesktop />
-        </div>
-
-        {/* Content */}
-        <main className="flex-1 min-w-0">
-          {/* Header */}
-
-          <header className="w-full h-18 border-b border-slate-800/70 bg-[#0B1420]">
-            <div className="w-full h-full px-4 md:px-6 flex items-center gap-3">
-              {/* Mobile logo */}
-              <button
-                className="md:hidden cursor-pointer flex items-center"
-                type="button"
-              >
-                <Image src={ICON.logo} alt="2KQuant" width={110} height={26} />
-              </button>
-
-              {/* Search */}
-              <div className="flex-1 w-full md:max-w-none">
-                <div className="h-10 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] flex items-center px-3 gap-2">
-                  <Image
-                    src={ICON.search}
-                    alt="search"
-                    width={18}
-                    height={22}
-                  />
-                  <input
-                    className="bg-transparent outline-none w-full text-xs md:text-sm placeholder:text-slate-500"
-                    placeholder="Search for asset..."
-                  />
-                </div>
-              </div>
-
-              {/* 🔐 Right area */}
-
-              <div className="flex items-center gap-2">
-                {false ? ( // ✅ 로그인 상태면 true로
-                  <>
-                    {/* Bell */}
-                    <IconButton iconSrc={ICON.bell} alt="notifications" />
-
-                    {/* Sign out */}
-                    <button
-                      type="button"
-                      className="
-          h-9 px-4
-          rounded-xl
-          border border-slate-700/70
-          bg-slate-900/35
-          text-slate-100
-          hover:bg-slate-900/60
-          active:scale-[0.98]
-          transition
-          text-sm font-medium
-        "
-                    >
-                      Sign out
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {/* Sign in */}
-                    <button
-                      type="button"
-                      className="
-          h-9 px-4
-          rounded-xl
-          border border-slate-700/70
-          bg-slate-900/35
-          text-slate-100
-          hover:bg-slate-900/60
-          active:scale-[0.98]
-          transition
-          text-sm font-medium
-        "
-                    >
-                      Sign in
-                    </button>
-
-                    {/* Sign up */}
-                    <button
-                      type="button"
-                      className="
-          h-9 px-4
-          rounded-xl
-          border border-sky-400/30
-          bg-sky-500/15
-          text-sky-200
-          hover:bg-sky-500/25
-          hover:border-sky-400/45
-          active:scale-[0.98]
-          transition
-          text-sm font-semibold
-          shadow-[0_10px_30px_rgba(0,140,255,0.10)]
-        "
-                    >
-                      Sign up
-                    </button>
-                  </>
+                )}
+                {emailCheckStatus === "invalid" && (
+                  <span className="text-amber-300">
+                    이메일 형식이 올바르지 않습니다.
+                  </span>
                 )}
               </div>
             </div>
 
-            {/* Mobile states row 유지 */}
-            <div className="lg:hidden px-4 md:px-6 pb-3 pt-2">
-              <div className="flex items-center gap-4 text-xs text-slate-300/80">
-                <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-400" />
-                  <span className="text-slate-400">Data:</span>
-                  <span className="text-green-400">Live</span>
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="text-slate-400">Model:</span>
-                  <span>Predicting</span>
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="text-slate-400">Exchange:</span>
-                  <span>Binance</span>
-                </span>
-              </div>
-            </div>
-          </header>
-
-          {/* Body */}
-          <div className="px-4 md:px-6 py-5 md:py-5 mt-4 pb-24 md:pb-10">
-            {/* KPI row: desktop 4 cols, mobile 2 cols */}
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-              <KpiCard
-                label="Today's PnL"
-                value="+ 4.4%"
-                valueClass="text-green-400"
-              />
-              <KpiCard
-                label="Total ROI"
-                value="+ 52.3%"
-                valueClass="text-slate-100"
-              />
-              <KpiCard
-                label="Max Drawdown"
-                value="- 5.18%"
-                valueClass="text-red-400"
-              />
-              <KpiCard
-                label="Win Rate"
-                value="69%"
-                valueClass="text-slate-100"
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                비밀번호
+              </label>
+              <input
+                value={signUpPassword}
+                onChange={(e) => setSignUpPassword(e.target.value)}
+                type="password"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none placeholder:text-slate-600 focus:border-slate-600/80"
+                disabled={isLoading}
               />
             </div>
 
-            {/* Main grid */}
-            <div className="mt-5 grid grid-cols-1 xl:grid-cols-12 gap-4">
-              {/* Equity Curve (big) */}
-              <Card title="Equity Curve" className="xl:col-span-8">
-                <div className="h-56 md:h-72 rounded-lg border border-slate-800/70 bg-[#0B1420]/60 flex items-center justify-center text-slate-500">
-                  Chart Placeholder (나중에 차트 컴포넌트)
-                </div>
-              </Card>
-
-              {/* AI Predictions */}
-              <Card title="AI Predictions" rightDots className="xl:col-span-4">
-                <div className="space-y-3">
-                  <div className="h-12 rounded-lg bg-slate-900/30 border border-slate-800/70" />
-                  <div className="h-12 rounded-lg bg-slate-900/30 border border-slate-800/70" />
-                  <div className="h-12 rounded-lg bg-slate-900/30 border border-slate-800/70" />
-                  <div className="h-12 rounded-lg bg-slate-900/30 border border-slate-800/70" />
-                </div>
-              </Card>
-
-              {/* Recent Trades */}
-              <Card title="Recent Trades" className="xl:col-span-8">
-                <div className="h-44 md:h-56 rounded-lg border border-slate-800/70 bg-[#0B1420]/60 flex items-center justify-center text-slate-500">
-                  List Placeholder (최근 체결 내역)
-                </div>
-              </Card>
-
-              {/* Alert Activity */}
-              <Card title="Alert Activity" rightDots className="xl:col-span-4">
-                <div className="space-y-3">
-                  <div className="h-12 rounded-lg bg-slate-900/30 border border-slate-800/70" />
-                  <div className="h-12 rounded-lg bg-slate-900/30 border border-slate-800/70" />
-                  <div className="h-12 rounded-lg bg-slate-900/30 border border-slate-800/70" />
-                </div>
-              </Card>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">
+                비밀번호 확인
+              </label>
+              <input
+                value={signUpPassword2}
+                onChange={(e) => setSignUpPassword2(e.target.value)}
+                type="password"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none placeholder:text-slate-600 focus:border-slate-600/80"
+                disabled={isLoading}
+              />
             </div>
-          </div>
-        </main>
+
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 py-3">
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={agreedTos}
+                  onChange={(e) => setAgreedTos(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-emerald-400"
+                  disabled={isLoading}
+                />
+                <span className="text-sm text-slate-200">
+                  이용약관에 동의합니다
+                  <span className="block text-xs text-slate-500 mt-1">
+                    계정 생성을 위해 필수 동의 항목입니다.
+                  </span>
+                </span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => router.push("/terms?from=signup")}
+                className="text-xs text-sky-200 hover:text-sky-100 underline underline-offset-4 shrink-0 disabled:opacity-60"
+                disabled={isLoading}
+              >
+                이용약관 확인
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="h-11 w-full rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 hover:border-emerald-400/45 transition text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {isLoading && (
+                <span className="h-4 w-4 rounded-full border-2 border-slate-200/40 border-t-transparent animate-spin" />
+              )}
+              {isLoading ? "가입 처리 중..." : "회원가입 확인"}
+            </button>
+          </form>
+        </div>
       </div>
 
-      {/* Mobile bottom nav */}
-      <BottomNavMobile />
+      {/* Footer */}
+      <p className="mt-6 text-xs text-slate-500 text-center leading-relaxed">
+        © {year} 2K Quant. AI-Driven Quantitative Trading Platform. All rights
+        reserved.
+      </p>
     </div>
   );
 }

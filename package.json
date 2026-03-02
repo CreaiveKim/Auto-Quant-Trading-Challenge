@@ -13,6 +13,8 @@
     "axios": "^1.13.6",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.19",
+    "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
     "framer-motion": "^12.34.3",
     "lightweight-charts": "^5.1.0",
     "lucide-react": "^0.575.0",

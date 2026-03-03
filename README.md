@@ -32,5 +32,7 @@ LOKI
 - Docker 기반 서버 환경 구축 및 n8n 워크플로우 설계.
 
 KCH
-- 증권사 Open API 연동
-- 버스 승객
+- Open API 연동
+- Next.js 기반 SPA 구조 설계
+- 실시간 시장 데이터 시각화 UI 구현
+- 백엔드(Python AI 모델) API 연동

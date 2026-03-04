@@ -99,7 +99,7 @@ export default function LandingPage() {
       await signInWithEmailAndPassword(auth, signInEmail, signInPassword);
 
       window.alert("로그인되었습니다.");
-      router.push("/dashboard");
+      router.push("/home");
     } catch (err: any) {
       console.error("FIREBASE_AUTH_ERROR:", err?.code, err?.message, err);
       window.alert(parseAuthError(err?.code));
@@ -188,7 +188,7 @@ export default function LandingPage() {
         <div className="space-y-3">
           <button
             onClick={() => setMode((m) => (m === "signin" ? "none" : "signin"))}
-            className="h-11 w-full rounded-xl border border-sky-400/40 bg-sky-500/20 hover:bg-sky-500/30 hover:border-sky-400/60 transition text-sky-200 font-semibold"
+            className="h-11 w-full cursor-pointer rounded-xl border border-sky-400/40 bg-sky-500/20 hover:bg-sky-500/30 hover:border-sky-400/60 transition text-sky-200 font-semibold"
             disabled={isLoading}
             type="button"
           >
@@ -197,7 +197,7 @@ export default function LandingPage() {
 
           <button
             onClick={() => setMode((m) => (m === "signup" ? "none" : "signup"))}
-            className="h-11 w-full rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 hover:border-emerald-400/45 transition text-sm font-semibold disabled:opacity-60"
+            className="h-11 w-full cursor-pointer rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 hover:border-emerald-400/45 transition text-sm font-semibold disabled:opacity-60"
             disabled={isLoading}
             type="button"
           >
@@ -247,7 +247,7 @@ export default function LandingPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="h-11 w-full rounded-xl border border-sky-400/30 bg-sky-500/15 text-sky-200 hover:bg-sky-500/25 hover:border-sky-400/45 transition text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+              className="h-11 w-full rounded-xl border border-sky-400/30 bg-sky-500/15 text-sky-200 hover:bg-sky-500/25 hover:border-sky-400/45 transition text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
             >
               {isLoading && (
                 <span className="h-4 w-4 rounded-full border-2 border-slate-200/40 border-t-transparent animate-spin" />
@@ -357,7 +357,7 @@ export default function LandingPage() {
               <button
                 type="button"
                 onClick={() => router.push("/terms?from=signup")}
-                className="text-xs text-sky-200 hover:text-sky-100 underline underline-offset-4 shrink-0 disabled:opacity-60"
+                className="text-xs cursor-pointer text-sky-200 hover:text-sky-100 underline underline-offset-4 shrink-0 disabled:opacity-60"
                 disabled={isLoading}
               >
                 이용약관 확인
@@ -367,7 +367,7 @@ export default function LandingPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="h-11 w-full rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 hover:border-emerald-400/45 transition text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+              className="h-11 w-full cursor-pointer rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 hover:border-emerald-400/45 transition text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {isLoading && (
                 <span className="h-4 w-4 rounded-full border-2 border-slate-200/40 border-t-transparent animate-spin" />

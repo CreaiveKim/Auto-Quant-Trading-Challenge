@@ -4,6 +4,7 @@
 import React from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 const ICON = {
   logo: "/images/logo1.png",
@@ -13,9 +14,9 @@ const ICON = {
   bell: "/icons/icon8.png",
   // sidebar icons
   dashboard: "/icons/icon1.png",
-  markets: "/icons/icon2.png",
-  live: "/icons/icon3.png",
-  signals: "/icons/icon4.png",
+  excution: "/icons/icon2.png",
+  weeklyReport: "/icons/icon17.png",
+  market: "/icons/icon18.png",
   support: "/icons/icon5.png",
   // mobile bottom icons
   home: "/icons/icon13.png",
@@ -29,17 +30,25 @@ type SideItem = {
 
 const SIDE_ITEMS: SideItem[] = [
   { key: "dashboard", label: "Dashboard", icon: ICON.dashboard },
-  { key: "markets", label: "Markets", icon: ICON.markets },
-  { key: "live", label: "Live Trading", icon: ICON.live },
-  { key: "signals", label: "Signals", icon: ICON.signals },
+  { key: "excution", label: "Excution", icon: ICON.excution },
+  {
+    key: "weeklyReport",
+    label: "WeeklyReport Trading",
+    icon: ICON.weeklyReport,
+  },
+  { key: "market", label: "Market", icon: ICON.market },
   { key: "support", label: "Support", icon: ICON.support },
 ];
 
 const MOBILE_ITEMS: SideItem[] = [
-  { key: "home", label: "Home", icon: ICON.home },
+  {
+    key: "weeklyReport",
+    label: "WeeklyReport",
+    icon: ICON.weeklyReport,
+  },
   { key: "dashboard", label: "Dashboard", icon: ICON.dashboard },
-  { key: "live", label: "Live Trading", icon: ICON.live },
-  { key: "signals", label: "Signals", icon: ICON.signals },
+  { key: "home", label: "Home", icon: ICON.home },
+  { key: "market", label: "Market", icon: ICON.market },
   { key: "settings", label: "Settings", icon: ICON.settings },
 ];
 
@@ -68,7 +77,6 @@ function SidebarDesktop() {
       {/* Logo area */}
       <div className="h-18 px-4 flex items-center gap-3 border-b border-slate-800/70">
         <button type="button" className="flex items-center cursor-pointer">
-          {/* ✅ height=0 제거 (Next/Image 권장 형태로) */}
           <Image src={ICON.logo} alt="2KQuant" width={180} height={40} />
         </button>
       </div>
@@ -91,44 +99,49 @@ function SidebarDesktop() {
 }
 
 function BottomNavMobile() {
-  // ✅ window 직접 접근 제거 -> hydration mismatch 방지
   const pathname = usePathname();
+  const router = useRouter();
 
-  const isActive = (key: string) => {
-    if (key === "home") return pathname === "/";
-    return pathname.includes(key);
+  const getActiveKey = () => {
+    if (pathname === "/") return "home";
+
+    const found = MOBILE_ITEMS.find((it) => pathname.startsWith(`/${it.key}`));
+
+    return found ? found.key : "home";
   };
+
+  const activeKey = getActiveKey();
+
+  const activeIndex = MOBILE_ITEMS.findIndex((it) => it.key === activeKey);
 
   return (
     <div
       className="fixed bottom-4 left-0 right-0 z-50 md:hidden px-3"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div
-        className="
-          mx-auto w-full max-w-md
-          rounded-[28px]
-          border-2 border-slate-700/70
-          bg-[#0B1420]/95
-          backdrop-blur-xl
-          shadow-[0_14px_48px_rgba(0,0,0,0.55)]
-        "
-      >
+      <div className="mx-auto w-full max-w-md rounded-[28px] border-2 border-slate-700/70 bg-[#0B1420]/95 backdrop-blur-xl shadow-[0_14px_48px_rgba(0,0,0,0.55)]">
         <div className="p-2">
-          <div className="grid grid-cols-5 gap-1">
+          <div className="relative grid grid-cols-5 gap-1">
+            <span
+              className="pointer-events-none absolute top-2 h-12 w-12 rounded-full bg-slate-200/25 blur-lg transition-transform duration-300 ease-out"
+              style={{
+                left: "50%",
+                transform: `translateX(calc(-50% + ${activeIndex} * 20%))`,
+              }}
+            />
+
             {MOBILE_ITEMS.map((it) => {
-              const active = isActive(it.key);
+              const active = it.key === activeKey;
 
               return (
                 <button
                   key={it.key}
                   type="button"
+                  onClick={() =>
+                    router.push(it.key === "home" ? "/" : `/${it.key}`)
+                  }
                   className="relative flex flex-col items-center justify-center gap-1 rounded-2xl py-2 cursor-pointer transition hover:bg-slate-900/40"
                 >
-                  {active && (
-                    <span className="pointer-events-none absolute top-2 h-12 w-12 rounded-full bg-slate-200/25 blur-lg" />
-                  )}
-
                   <span className="relative z-10">
                     <Image
                       src={it.icon}
@@ -210,6 +223,8 @@ function KpiCard({
 }
 
 export default function Page() {
+  const router = useRouter();
+
   return (
     <div className="min-h-screen bg-[#0B1420] text-white">
       <div className="flex">
@@ -266,35 +281,24 @@ export default function Page() {
                 </span>
               </div>
 
-              {/* 🔐 Right area */}
               <div className="flex items-center gap-2">
-                {false ? (
-                  <>
-                    <IconButton iconSrc={ICON.bell} alt="notifications" />
-                    <button
-                      type="button"
-                      className="h-9 px-4 rounded-xl border border-slate-700/70 bg-slate-900/35 text-slate-100 hover:bg-slate-900/60 active:scale-[0.98] transition text-sm font-medium cursor-pointer"
-                    >
-                      Sign out
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="h-9 px-4 rounded-xl border border-slate-700/70 bg-slate-900/35 text-slate-100 hover:bg-slate-900/60 active:scale-[0.98] transition text-sm font-medium cursor-pointer"
-                    >
-                      Sign in
-                    </button>
-
-                    <button
-                      type="button"
-                      className="h-9 px-4 rounded-xl border border-sky-400/30 bg-sky-500/15 text-sky-200 hover:bg-sky-500/25 hover:border-sky-400/45 active:scale-[0.98] transition cursor-pointer text-sm font-semibold shadow-[0_10px_30px_rgba(0,140,255,0.10)]"
-                    >
-                      Sign up
-                    </button>
-                  </>
-                )}
+                <>
+                  <IconButton iconSrc={ICON.bell} alt="notifications" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const confirmed =
+                        window.confirm("현재 로그인 세션을 종료할까요?");
+                      if (confirmed) {
+                        // 🔐 나중에 firebase signOut() 여기 추가
+                        router.push("/");
+                      }
+                    }}
+                    className="h-9 px-4 rounded-xl border border-slate-700/70 bg-slate-900/35 text-slate-100 hover:bg-slate-900/60 active:scale-[0.98] transition text-sm font-medium cursor-pointer"
+                  >
+                    로그아웃
+                  </button>
+                </>
               </div>
             </div>
 

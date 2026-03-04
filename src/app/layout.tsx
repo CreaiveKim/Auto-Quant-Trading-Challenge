@@ -1,10 +1,9 @@
 // src/app/layout.tsx
 import "./globals.css";
-import type { Metadata } from "next";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "2K Quant",
-  description: "AI Quant Trading Platform",
+  description: "Quant Dashboard",
 };
 
 export default function RootLayout({
@@ -14,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className="bg-[#0B1420] text-white">{children}</body>
+      <body>{children}</body>
     </html>
   );
 }

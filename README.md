@@ -10,3 +10,10 @@ _250304_
 각 페이지 디테일 구현
 
 _250305_
+(app)/layout.tsx 디테일 개선
+바이낸스, 업비트 api
+
+_250306_
+F&G 연결
+weeklyReport 페이지 구현
+settings 페이지 구현

@@ -22,7 +22,6 @@ function Card({
         {right}
       </div>
 
-      {/* header(44px) 제외한 영역을 카드 컨텐츠가 꽉 쓰게 */}
       <div className="p-4 h-[calc(100%-44px)]">{children}</div>
     </section>
   );
@@ -210,7 +209,6 @@ export default function HomePage() {
           </Card>
         </div>
 
-        {/* Right (4): 위/아래 반반 */}
         <div className="lg:col-span-4 min-h-0 flex flex-col gap-4">
           <Card
             title="AI Predictions"
@@ -273,9 +271,6 @@ export default function HomePage() {
           </Card>
 
           <Card title="Alerts / Logs" className="flex-1 min-h-0">
-            {/* 스크롤을 만들지 말라는 요구라서 overflow-hidden.
-                로그가 더 늘어나면 "페이지 스크롤" 대신
-                여기만 내부 스크롤로 바꾸고 싶으면 overflow-auto로 바꾸면 됨. */}
             <div className="h-full min-h-0 rounded-xl border border-slate-800/70 bg-[#0B1420]/35 p-3 text-xs text-slate-300 overflow-hidden">
               <div className="space-y-2">
                 <div className="text-slate-500">• Connected to Binance ✅</div>

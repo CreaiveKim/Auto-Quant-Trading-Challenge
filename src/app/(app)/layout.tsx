@@ -3,6 +3,13 @@
 import React from "react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { ExchangeProvider, useExchange } from "@/contexts/exchange-context";
+import {
+  FearGreedProvider,
+  useFearGreed,
+  getFearGreedColor,
+  getFearGreedLabel,
+} from "@/contexts/fear-greed-context";
 
 const ICON = {
   logo: "/images/logo1.png",
@@ -43,24 +50,23 @@ function SidebarDesktop() {
     key === "home" ? pathname === "/home" : pathname.startsWith(`/${key}`);
 
   return (
-    <aside className="h-screen w-56 shrink-0 border-r border-slate-800/70 bg-[#0C1624]">
+    <aside className="hidden lg:flex fixed left-0 top-0 h-screen w-56 flex-col border-r border-slate-800/70 bg-[#0C1624] z-50">
       <div className="h-16 px-4 flex items-center border-b border-slate-800/70">
         <button onClick={() => router.push("/home")} className="cursor-pointer">
           <Image src={ICON.logo} alt="logo" width={160} height={40} />
         </button>
       </div>
 
-      <nav className="p-3 space-y-2">
+      <nav className="p-3 space-y-2 overflow-y-auto flex-1">
         {SIDE_ITEMS.map((it) => (
           <button
             key={it.key}
             onClick={() => to(it.key)}
-            className={`w-full flex items-center gap-3 rounded-xl px-3 py-3 border transition cursor-pointer
-              ${
-                isActive(it.key)
-                  ? "border-slate-700/60 bg-slate-900/35"
-                  : "border-transparent hover:border-slate-700/50 hover:bg-slate-900/30"
-              }`}
+            className={`w-full flex items-center gap-3 rounded-xl px-3 py-3 border transition cursor-pointer ${
+              isActive(it.key)
+                ? "border-slate-700/60 bg-slate-900/35"
+                : "border-transparent hover:border-slate-700/50 hover:bg-slate-900/30"
+            }`}
           >
             <Image src={it.icon} alt={it.label} width={22} height={22} />
             <span>{it.label}</span>
@@ -118,98 +124,178 @@ function BottomNavMobile() {
   );
 }
 
+function ExchangeToggle() {
+  const { exchange, setExchange } = useExchange();
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-slate-400 text-xs">Exchange:</span>
+
+      <div className="flex items-center rounded-xl border border-slate-700/70 bg-[#101C2E] p-1">
+        <button
+          type="button"
+          onClick={() => setExchange("binance")}
+          className={[
+            "px-3 py-1.5 text-xs rounded-lg transition cursor-pointer",
+            exchange === "binance"
+              ? "bg-white/15 text-white"
+              : "text-slate-300/80 hover:bg-white/10",
+          ].join(" ")}
+        >
+          Binance
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setExchange("upbit")}
+          className={[
+            "px-3 py-1.5 text-xs rounded-lg transition cursor-pointer",
+            exchange === "upbit"
+              ? "bg-white/15 text-white"
+              : "text-slate-300/80 hover:bg-white/10",
+          ].join(" ")}
+        >
+          Upbit
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FearGreedIndicator() {
+  const { exchange } = useExchange();
+  const { binance, upbit, loading } = useFearGreed();
+
+  const current = exchange === "binance" ? binance : upbit;
+
+  if (loading) {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-slate-500 animate-pulse" />
+        <span className="text-slate-400">
+          <span className="md:hidden">F&G:</span>
+          <span className="hidden md:inline">Fear & Greed:</span>
+        </span>
+        <span className="text-slate-300">Loading...</span>
+      </span>
+    );
+  }
+
+  if (!current) {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-slate-500" />
+        <span className="text-slate-400">
+          <span className="md:hidden">F&G:</span>
+          <span className="hidden md:inline">Fear & Greed:</span>
+        </span>
+        <span className="text-slate-300">Unavailable</span>
+      </span>
+    );
+  }
+
+  const color = getFearGreedColor(current.value);
+  const label = getFearGreedLabel(current.value);
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`h-2 w-2 rounded-full ${color.dot}`} />
+      <span className="text-slate-400">
+        <span className="md:hidden">F&G:</span>
+        <span className="hidden md:inline">Fear & Greed:</span>
+      </span>
+
+      <div
+        className={`inline-flex items-center gap-2 rounded-xl border px-2.5 py-1 ${color.badge}`}
+      >
+        <span className="font-semibold">{current.value}</span>
+        <span className="text-[11px] opacity-90">{label}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-[#0B1420] text-white">
-      <div className="flex">
-        <div className="hidden lg:block">
+    <ExchangeProvider>
+      <FearGreedProvider>
+        <div className="min-h-screen bg-[#0B1420] text-white">
+          {/* ✅ 데스크탑 fixed 사이드바 */}
           <SidebarDesktop />
-        </div>
 
-        <main className="flex-1">
-          <header className="bg-[#0B1420] sticky top-0 z-50">
-            <div className="h-16 flex items-center border-b border-slate-800/70 gap-2 px-6 py-2 ">
-              <button
-                className="lg:hidden flex items-center cursor-pointer "
-                onClick={() => router.push("/home")}
-              >
-                <Image src={ICON.logo} alt="logo" width={120} height={26} />
-              </button>
+          {/* ✅ 메인은 데스크탑에서 사이드바 폭(=w-56)만큼 밀기 */}
+          <main className="flex-1 lg:pl-56">
+            <header className="bg-[#0B1420] sticky top-0 z-50">
+              <div className="h-16 flex items-center border-b border-slate-800/70 gap-2 px-6 py-2 ">
+                <button
+                  className="lg:hidden flex items-center cursor-pointer "
+                  onClick={() => router.push("/home")}
+                >
+                  <Image src={ICON.logo} alt="logo" width={120} height={26} />
+                </button>
 
-              <div className="flex-1">
-                <div className="h-10 rounded-xl border border-slate-800/70 bg-[#101C2E] flex items-center px-3 gap-2">
-                  <Image
-                    src={ICON.search}
-                    alt="search"
-                    width={18}
-                    height={18}
-                    className="cursor-pointer"
-                  />
-                  <input
-                    className="bg-transparent outline-none w-full text-xs placeholder:text-slate-500"
-                    placeholder="Search for asset..."
-                  />
+                <div className="flex-1">
+                  <div className="h-10 rounded-xl border border-slate-800/70 bg-[#101C2E] flex items-center px-3 gap-2">
+                    <Image
+                      src={ICON.search}
+                      alt="search"
+                      width={18}
+                      height={18}
+                      className="cursor-pointer"
+                    />
+                    <input
+                      className="bg-transparent outline-none w-full text-xs placeholder:text-slate-500"
+                      placeholder="Search for asset..."
+                    />
+                  </div>
+                </div>
+
+                <div className="hidden lg:flex items-center gap-6 text-xs text-slate-300/80 mx-4">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-green-400" />
+                    <span className="text-slate-400">Data:</span>
+                    <span className="text-green-400">Live</span>
+                  </span>
+
+                  <FearGreedIndicator />
+
+                  <ExchangeToggle />
+                </div>
+
+                <button
+                  onClick={() => {
+                    const confirmed =
+                      window.confirm("현재 로그인 세션을 종료할까요?");
+                    if (confirmed) router.push("/");
+                  }}
+                  className="h-9 px-4 rounded-xl border border-slate-700/70 bg-slate-900/35 text-slate-100 hover:bg-slate-900/60 transition text-sm cursor-pointer"
+                >
+                  로그아웃
+                </button>
+              </div>
+
+              <div className="lg:hidden px-6 pt-2 ">
+                <div className="flex items-center gap-4 text-xs text-slate-300/80">
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-green-400" />
+                    <span className="text-slate-400">Data:</span>
+                    <span className="text-green-400">Live</span>
+                  </span>
+
+                  <FearGreedIndicator />
+                  <ExchangeToggle />
                 </div>
               </div>
+            </header>
 
-              <div className="hidden lg:flex items-center gap-6 text-xs text-slate-300/80 mx-4">
-                <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-400" />
-                  <span className="text-slate-400">Data:</span>
-                  <span className="text-green-400">Live</span>
-                </span>
+            <div className="px-6 py-4 pb-28 lg:pb-4">{children}</div>
+          </main>
 
-                <span className="flex items-center gap-1">
-                  <span className="text-slate-400">Model:</span>
-                  <span>Predicting</span>
-                </span>
-
-                <span className="flex items-center gap-1">
-                  <span className="text-slate-400">Exchange:</span>
-                  <span>Binance</span>
-                </span>
-              </div>
-
-              <button
-                onClick={() => {
-                  const confirmed =
-                    window.confirm("현재 로그인 세션을 종료할까요?");
-                  if (confirmed) router.push("/");
-                }}
-                className="h-9 px-4 rounded-xl border border-slate-700/70 bg-slate-900/35 text-slate-100 hover:bg-slate-900/60 transition text-sm cursor-pointer"
-              >
-                로그아웃
-              </button>
-            </div>
-
-            <div className="lg:hidden px-6 pt-2 ">
-              <div className="flex items-center gap-4 text-xs text-slate-300/80">
-                <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-400" />
-                  <span className="text-slate-400">Data:</span>
-                  <span className="text-green-400">Live</span>
-                </span>
-
-                <span className="flex items-center gap-1">
-                  <span className="text-slate-400">Model:</span>
-                  <span>Predicting</span>
-                </span>
-
-                <span className="flex items-center gap-1">
-                  <span className="text-slate-400">Exchange:</span>
-                  <span>Binance</span>
-                </span>
-              </div>
-            </div>
-          </header>
-
-          <div className="px-6 py-4 pb-28 lg:pb-4">{children}</div>
-        </main>
-      </div>
-
-      <BottomNavMobile />
-    </div>
+          <BottomNavMobile />
+        </div>
+      </FearGreedProvider>
+    </ExchangeProvider>
   );
 }

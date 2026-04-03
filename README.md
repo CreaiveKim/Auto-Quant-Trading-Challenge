@@ -28,10 +28,10 @@ _250311_
 거래기록 저장
 테스트 페이지에서 바로 검증
 
-_230313_
+_260313_
 Supabase 기반 거래소 API Key 암호화 저장 및 서버 경유 연동 구조 구현
 
-_230314_
+_260314_
 settings/dashboard
 → /api/exchange-balance
 → 로그인 유저 확인
@@ -40,3 +40,7 @@ settings/dashboard
 → Binance 또는 Upbit 잔고 API 호출
 → 가공된 잔고 JSON 반환
 → 화면에 표시
+
+_260402_
+사용자의 업비트 Access Key와 Secret Key 디비에 저장하기
+업비트에서 호출하여 잔고 불러오기

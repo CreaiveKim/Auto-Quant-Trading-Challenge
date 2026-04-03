@@ -1,479 +1,400 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
+import { fetchWithAuth } from "@/lib/auth/fetch-with-auth";
 
-type ExchangeType = "binance" | "upbit";
+type ExchangeType = "upbit" | "binance";
 
-type ExchangeAccountRow = {
+type ExchangeAccount = {
   id: string;
-  user_id: string;
-  exchange: "binance" | "upbit";
-  account_name: string | null;
-  is_testnet: boolean;
+  exchange: ExchangeType;
+  label: string | null;
+  memo: string | null;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
-  key_last4: string | null;
-  secret_last4: string | null;
 };
 
-const getAccessToken = async () => {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+type BalanceExchange = "upbit" | "binance";
 
-  return session?.access_token ?? null;
+type BalanceItem = {
+  asset: string;
+  free: string;
+  locked: string;
 };
+
+async function parseJsonSafely(res: Response) {
+  const text = await res.text();
+
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("JSON parse error:", error, "raw response:", text);
+    throw new Error("서버 응답이 JSON 형식이 아닙니다.");
+  }
+}
 
 export default function SettingsPage() {
-  const [userId, setUserId] = useState<string>("");
-  const [loadingUser, setLoadingUser] = useState(true);
-
-  const [exchange, setExchange] = useState<ExchangeType>("binance");
-  const [accountName, setAccountName] = useState("");
-  const [apiKey, setApiKey] = useState("");
+  const [exchange, setExchange] = useState<ExchangeType>("upbit");
+  const [label, setLabel] = useState("");
   const [accessKey, setAccessKey] = useState("");
-  const [apiSecret, setApiSecret] = useState("");
-  const [isTestnet, setIsTestnet] = useState(true);
-  const [isActive, setIsActive] = useState(true);
+  const [secretKey, setSecretKey] = useState("");
+  const [memo, setMemo] = useState("");
 
-  const [saving, setSaving] = useState(false);
-  const [fetching, setFetching] = useState(false);
-  const [message, setMessage] = useState("");
+  const [accounts, setAccounts] = useState<ExchangeAccount[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
 
-  const [accounts, setAccounts] = useState<ExchangeAccountRow[]>([]);
+  const [selectedBalanceExchange, setSelectedBalanceExchange] =
+    useState<BalanceExchange>("upbit");
+  const [balances, setBalances] = useState<BalanceItem[]>([]);
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
 
-  const isBinance = useMemo(() => exchange === "binance", [exchange]);
-  const isUpbit = useMemo(() => exchange === "upbit", [exchange]);
+  async function loadExchangeAccounts() {
+    try {
+      setIsLoadingAccounts(true);
 
-  useEffect(() => {
-    const init = async () => {
-      setLoadingUser(true);
-      setMessage("");
+      const res = await fetchWithAuth("/api/exchange-accounts", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+      const result = await parseJsonSafely(res);
 
-      if (error || !user) {
-        setMessage("로그인이 필요합니다.");
-        setLoadingUser(false);
+      if (!res.ok) {
+        throw new Error(result?.message || "거래소 계정 조회 실패");
+      }
+
+      setAccounts(result?.accounts ?? []);
+    } catch (error: any) {
+      console.error("loadExchangeAccounts error:", error);
+      window.alert(error?.message || "거래소 계정 목록을 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingAccounts(false);
+    }
+  }
+
+  async function loadBalances(exchange: BalanceExchange) {
+    try {
+      setIsLoadingBalances(true);
+
+      if (exchange === "binance") {
+        setBalances([]);
         return;
       }
 
-      setUserId(user.id);
-      setLoadingUser(false);
-    };
+      const res = await fetchWithAuth("/api/upbit/balances", {
+        method: "GET",
+        cache: "no-store",
+      });
 
-    init();
+      const result = await parseJsonSafely(res);
+
+      if (!res.ok) {
+        throw new Error(result?.message || "잔고 조회 실패");
+      }
+
+      setBalances(Array.isArray(result?.balances) ? result.balances : []);
+    } catch (error: any) {
+      console.error("loadBalances error:", error);
+      setBalances([]);
+      window.alert(error?.message || "잔고를 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingBalances(false);
+    }
+  }
+
+  async function handleSaveExchangeAccount(
+    e: React.FormEvent<HTMLFormElement>,
+  ) {
+    e.preventDefault();
+
+    if (isSaving) return;
+
+    const trimmedLabel = label.trim();
+    const trimmedAccessKey = accessKey.trim();
+    const trimmedSecretKey = secretKey.trim();
+    const trimmedMemo = memo.trim();
+
+    if (!trimmedAccessKey || !trimmedSecretKey) {
+      window.alert("Access Key와 Secret Key를 모두 입력해 주세요.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const res = await fetchWithAuth("/api/exchange-accounts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          exchange,
+          label: trimmedLabel,
+          accessKey: trimmedAccessKey,
+          secretKey: trimmedSecretKey,
+          memo: trimmedMemo,
+        }),
+      });
+
+      const result = await parseJsonSafely(res);
+
+      if (!res.ok) {
+        throw new Error(result?.message || "거래소 계정 저장 실패");
+      }
+
+      window.alert("거래소 계정이 저장되었습니다.");
+
+      setLabel("");
+      setAccessKey("");
+      setSecretKey("");
+      setMemo("");
+      setExchange("upbit");
+
+      await loadExchangeAccounts();
+
+      if (exchange === "upbit" || selectedBalanceExchange === "upbit") {
+        await loadBalances("upbit");
+      }
+    } catch (error: any) {
+      console.error("handleSaveExchangeAccount error:", error);
+      window.alert(error?.message || "거래소 계정 저장에 실패했습니다.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    loadExchangeAccounts();
   }, []);
 
   useEffect(() => {
-    if (!userId) return;
-    fetchAccounts();
-  }, [userId]);
-
-  const resetForm = () => {
-    setAccountName("");
-    setApiKey("");
-    setAccessKey("");
-    setApiSecret("");
-    setIsTestnet(true);
-    setIsActive(true);
-  };
-
-  const fetchAccounts = async () => {
-    setFetching(true);
-    setMessage("");
-
-    const token = await getAccessToken();
-
-    if (!token) {
-      setMessage("로그인이 필요합니다.");
-      setFetching(false);
-      return;
-    }
-
-    const res = await fetch("/api/exchange-accounts", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      setMessage(result.message || "계정 조회 실패");
-      setFetching(false);
-      return;
-    }
-
-    setAccounts(result.accounts ?? []);
-    setFetching(false);
-  };
-
-  const handleSave = async () => {
-    if (!accountName.trim()) {
-      setMessage("계정 이름을 입력하세요.");
-      return;
-    }
-
-    if (isBinance && !apiKey.trim()) {
-      setMessage("바이낸스 API Key를 입력하세요.");
-      return;
-    }
-
-    if (isUpbit && !accessKey.trim()) {
-      setMessage("업비트 Access Key를 입력하세요.");
-      return;
-    }
-
-    if (!apiSecret.trim()) {
-      setMessage("Secret Key를 입력하세요.");
-      return;
-    }
-
-    setSaving(true);
-    setMessage("");
-
-    const token = await getAccessToken();
-
-    if (!token) {
-      setMessage("로그인이 필요합니다.");
-      setSaving(false);
-      return;
-    }
-
-    const res = await fetch("/api/exchange-accounts", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        exchange,
-        accountName,
-        apiKey,
-        accessKey,
-        apiSecret,
-        isTestnet,
-        isActive,
-      }),
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      setMessage(result.message || "저장 실패");
-      setSaving(false);
-      return;
-    }
-
-    setMessage("거래소 연동 정보 저장 완료");
-    resetForm();
-    await fetchAccounts();
-    setSaving(false);
-  };
-
-  const handleToggleActive = async (id: string, nextValue: boolean) => {
-    setMessage("");
-
-    const token = await getAccessToken();
-
-    if (!token) {
-      setMessage("로그인이 필요합니다.");
-      return;
-    }
-
-    const res = await fetch("/api/exchange-accounts", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        id,
-        isActive: nextValue,
-      }),
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      setMessage(result.message || "상태 변경 실패");
-      return;
-    }
-
-    setMessage("연동 상태 변경 완료");
-    await fetchAccounts();
-  };
-
-  const handleDelete = async (id: string) => {
-    setMessage("");
-
-    const token = await getAccessToken();
-
-    if (!token) {
-      setMessage("로그인이 필요합니다.");
-      return;
-    }
-
-    const res = await fetch(`/api/exchange-accounts?id=${id}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const result = await res.json();
-
-    if (!res.ok) {
-      setMessage(result.message || "삭제 실패");
-      return;
-    }
-
-    setMessage("연동 정보 삭제 완료");
-    await fetchAccounts();
-  };
-
-  if (loadingUser) {
-    return (
-      <main className="min-h-screen bg-[#071120] p-6 text-white">
-        <div className="mx-auto max-w-5xl">유저 확인 중...</div>
-      </main>
-    );
-  }
+    loadBalances(selectedBalanceExchange);
+  }, [selectedBalanceExchange]);
 
   return (
-    <main className="min-h-screen bg-[#071120] p-4 text-white md:p-6">
-      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[420px_1fr]">
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <h1 className="text-2xl font-bold">거래소 연동</h1>
-          <p className="mt-2 text-sm text-white/70">
-            먼저 연동 정보를 저장하고, 다음 단계에서 서버를 통해 실제 잔고
-            조회를 붙입니다.
-          </p>
+    <div className="min-h-screen bg-[#0B1420] px-4 py-8 text-white">
+      <div className="mx-auto w-full max-w-3xl">
+        <h1 className="mb-6 text-2xl font-bold">설정</h1>
 
-          <div className="mt-6 space-y-4">
+        <section className="rounded-2xl border border-slate-800/70 bg-[#0F1A2A]/70 p-5 shadow-[0_14px_48px_rgba(0,0,0,0.35)]">
+          <h2 className="mb-4 text-lg font-semibold">거래소 API 키 등록</h2>
+
+          <form onSubmit={handleSaveExchangeAccount} className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm text-white/70">거래소</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setExchange("binance")}
-                  className={`rounded-xl px-4 py-3 font-semibold transition ${
-                    isBinance
-                      ? "bg-blue-600 text-white"
-                      : "bg-white/5 text-white/70"
-                  }`}
-                >
-                  Binance
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExchange("upbit")}
-                  className={`rounded-xl px-4 py-3 font-semibold transition ${
-                    isUpbit
-                      ? "bg-blue-600 text-white"
-                      : "bg-white/5 text-white/70"
-                  }`}
-                >
-                  Upbit
-                </button>
-              </div>
+              <label className="mb-2 block text-sm text-slate-300">
+                거래소
+              </label>
+              <select
+                value={exchange}
+                onChange={(e) => setExchange(e.target.value as ExchangeType)}
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none"
+                disabled={isSaving}
+              >
+                <option value="upbit">Upbit</option>
+                <option value="binance">Binance</option>
+              </select>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-white/70">
-                계정 이름
+              <label className="mb-2 block text-sm text-slate-300">
+                계정 별칭
               </label>
               <input
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                placeholder="예: 내 바이낸스 본계정"
-                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                type="text"
+                placeholder="예: 메인 업비트 / 바이낸스 실거래"
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none placeholder:text-slate-600"
+                disabled={isSaving}
               />
             </div>
 
-            {isBinance && (
-              <div>
-                <label className="mb-2 block text-sm text-white/70">
-                  Binance API Key
-                </label>
-                <input
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="바이낸스 API Key"
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
-                />
-              </div>
-            )}
-
-            {isUpbit && (
-              <div>
-                <label className="mb-2 block text-sm text-white/70">
-                  Upbit Access Key
-                </label>
-                <input
-                  value={accessKey}
-                  onChange={(e) => setAccessKey(e.target.value)}
-                  placeholder="업비트 Access Key"
-                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
-                />
-              </div>
-            )}
+            <div>
+              <label className="mb-2 block text-sm text-slate-300">
+                Access Key
+              </label>
+              <input
+                value={accessKey}
+                onChange={(e) => setAccessKey(e.target.value)}
+                type="text"
+                placeholder="거래소 Access Key"
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none placeholder:text-slate-600"
+                disabled={isSaving}
+              />
+            </div>
 
             <div>
-              <label className="mb-2 block text-sm text-white/70">
+              <label className="mb-2 block text-sm text-slate-300">
                 Secret Key
               </label>
               <input
-                value={apiSecret}
-                onChange={(e) => setApiSecret(e.target.value)}
-                placeholder="Secret Key"
-                className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 outline-none"
+                value={secretKey}
+                onChange={(e) => setSecretKey(e.target.value)}
+                type="password"
+                placeholder="거래소 Secret Key"
+                className="h-11 w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 text-sm outline-none placeholder:text-slate-600"
+                disabled={isSaving}
               />
             </div>
 
-            {isBinance && (
-              <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={isTestnet}
-                  onChange={(e) => setIsTestnet(e.target.checked)}
-                />
-                <span className="text-sm text-white/80">테스트넷 사용</span>
-              </label>
-            )}
-
-            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
+            <div>
+              <label className="mb-2 block text-sm text-slate-300">메모</label>
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                placeholder="예: 실거래 계정, 테스트 계정"
+                className="min-h-[96px] w-full rounded-xl border border-slate-800/70 bg-[#101C2E] px-3 py-3 text-sm outline-none placeholder:text-slate-600"
+                disabled={isSaving}
               />
-              <span className="text-sm text-white/80">활성 상태로 저장</span>
-            </label>
+            </div>
 
             <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-semibold disabled:opacity-50"
+              type="submit"
+              disabled={isSaving}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400/45 hover:bg-emerald-500/25 disabled:opacity-60"
             >
-              {saving ? "저장 중..." : "연동 정보 저장"}
+              {isSaving && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200/40 border-t-transparent" />
+              )}
+              {isSaving ? "저장 중..." : "거래소 키 저장"}
             </button>
-
-            {message && (
-              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/85">
-                {message}
-              </div>
-            )}
-          </div>
+          </form>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold">저장된 연동 계정</h2>
-              <p className="mt-1 text-sm text-white/70">
-                현재 로그인한 사용자 기준으로 조회됩니다.
-              </p>
-            </div>
+        <section className="mt-6 rounded-2xl border border-slate-800/70 bg-[#0F1A2A]/70 p-5 shadow-[0_14px_48px_rgba(0,0,0,0.35)]">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">등록된 거래소 계정</h2>
 
             <button
               type="button"
-              onClick={fetchAccounts}
-              className="rounded-xl bg-white/10 px-4 py-2 text-sm font-medium"
+              onClick={loadExchangeAccounts}
+              disabled={isLoadingAccounts}
+              className="h-10 rounded-xl border border-sky-400/30 bg-sky-500/15 px-4 text-sm font-semibold text-sky-200 transition hover:border-sky-400/45 hover:bg-sky-500/25 disabled:opacity-60"
             >
-              {fetching ? "불러오는 중..." : "새로고침"}
+              {isLoadingAccounts ? "불러오는 중..." : "새로고침"}
             </button>
           </div>
 
-          <div className="mt-5 space-y-4">
-            {accounts.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-white/60">
-                저장된 거래소 연동 정보가 없습니다.
-              </div>
-            ) : (
-              accounts.map((item) => (
+          {isLoadingAccounts ? (
+            <div className="text-sm text-slate-400">
+              계정 목록을 불러오는 중입니다...
+            </div>
+          ) : accounts.length === 0 ? (
+            <div className="text-sm text-slate-400">
+              아직 등록된 거래소 계정이 없습니다.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {accounts.map((account) => (
                 <div
-                  key={item.id}
-                  className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                  key={account.id}
+                  className="rounded-xl border border-slate-800/70 bg-[#101C2E] p-4"
                 >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-blue-500/20 px-3 py-1 text-xs font-semibold uppercase text-blue-300">
-                          {item.exchange}
-                        </span>
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            item.is_active
-                              ? "bg-emerald-500/20 text-emerald-300"
-                              : "bg-red-500/20 text-red-300"
-                          }`}
-                        >
-                          {item.is_active ? "ACTIVE" : "INACTIVE"}
-                        </span>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-white">
+                        {account.label?.trim()
+                          ? account.label
+                          : account.exchange.toUpperCase()}
                       </div>
-
-                      <div className="text-lg font-semibold">
-                        {item.account_name || "이름 없음"}
+                      <div className="mt-1 text-sm text-slate-400">
+                        거래소: {account.exchange}
                       </div>
-
-                      <div className="text-sm text-white/65">
-                        생성일: {new Date(item.created_at).toLocaleString()}
+                      <div className="mt-1 text-sm text-slate-400">
+                        상태: {account.is_active ? "활성" : "비활성"}
                       </div>
-
-                      <div className="text-sm text-white/65">
-                        테스트넷: {item.is_testnet ? "ON" : "OFF"}
-                      </div>
-
-                      <div className="text-sm text-white/65">
-                        Key 상태:{" "}
-                        {item.key_last4
-                          ? `저장됨 (끝 4자리: ${item.key_last4})`
-                          : "없음"}
-                      </div>
-
-                      <div className="text-sm text-white/65">
-                        Secret 상태:{" "}
-                        {item.secret_last4
-                          ? `저장됨 (끝 4자리: ${item.secret_last4})`
-                          : "없음"}
-                      </div>
+                      {account.memo ? (
+                        <div className="mt-1 text-sm text-slate-400">
+                          메모: {account.memo}
+                        </div>
+                      ) : null}
                     </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleToggleActive(item.id, !item.is_active)
-                        }
-                        className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-black"
-                      >
-                        {item.is_active ? "비활성화" : "활성화"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item.id)}
-                        className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold"
-                      >
-                        삭제
-                      </button>
+                    <div className="shrink-0 text-xs text-slate-500">
+                      {new Date(account.created_at).toLocaleString()}
                     </div>
                   </div>
                 </div>
-              ))
-            )}
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-slate-800/70 bg-[#0F1A2A]/70 p-5 shadow-[0_14px_48px_rgba(0,0,0,0.35)]">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">거래소 잔고</h2>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedBalanceExchange("upbit")}
+                className={`h-10 rounded-xl border px-4 text-sm font-semibold transition ${
+                  selectedBalanceExchange === "upbit"
+                    ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-200"
+                    : "border-slate-700 bg-[#101C2E] text-slate-300"
+                }`}
+              >
+                Upbit
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedBalanceExchange("binance")}
+                className={`h-10 rounded-xl border px-4 text-sm font-semibold transition ${
+                  selectedBalanceExchange === "binance"
+                    ? "border-amber-400/40 bg-amber-500/20 text-amber-200"
+                    : "border-slate-700 bg-[#101C2E] text-slate-300"
+                }`}
+              >
+                Binance
+              </button>
+            </div>
           </div>
+
+          {selectedBalanceExchange === "binance" ? (
+            <div className="rounded-xl border border-slate-800/70 bg-[#101C2E] p-4 text-sm text-slate-400">
+              바이낸스 잔고 조회 UI만 먼저 연결해둠. 실제 API 연동은 나중에
+              추가하면 된다.
+            </div>
+          ) : isLoadingBalances ? (
+            <div className="text-sm text-slate-400">
+              잔고를 불러오는 중입니다...
+            </div>
+          ) : balances.length === 0 ? (
+            <div className="text-sm text-slate-400">
+              표시할 업비트 잔고가 없습니다.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {balances.map((item, index) => (
+                <div
+                  key={`${item.asset ?? "unknown"}-${index}`}
+                  className="rounded-xl border border-slate-800/70 bg-[#101C2E] p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-white">
+                        {item.asset}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-400">
+                        사용 가능: {item.free}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-400">
+                        잠금/주문 중: {item.locked}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
-    </main>
+    </div>
   );
 }

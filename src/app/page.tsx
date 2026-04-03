@@ -1,14 +1,9 @@
-// src/app/page.tsx
 "use client";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useMemo, useState } from "react";
-import { auth } from "@/lib/firebase";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
+import { supabase } from "@/lib/supabase/client";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -26,7 +21,6 @@ export default function LandingPage() {
   const [signUpPassword2, setSignUpPassword2] = useState("");
   const [agreedTos, setAgreedTos] = useState(false);
 
-  // ✅ 이메일 검증 상태 (중복체크는 "가입 시도 결과"로 판별)
   const [emailCheckStatus, setEmailCheckStatus] = useState<
     "idle" | "checking" | "available" | "taken" | "invalid"
   >("idle");
@@ -37,7 +31,6 @@ export default function LandingPage() {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
-  // ✅ 사전 체크는 "형식"만
   const checkEmailFormatOnly = (emailRaw: string) => {
     const email = emailRaw.trim().toLowerCase();
 
@@ -51,44 +44,54 @@ export default function LandingPage() {
       return { ok: false, reason: "invalid" as const };
     }
 
-    setEmailCheckStatus("available"); // "형식상 가능" 의미
+    setEmailCheckStatus("available");
     return { ok: true, reason: "format_ok" as const };
   };
 
-  const parseAuthError = (code?: string) => {
-    switch (code) {
-      case "auth/invalid-email":
-        return "이메일 형식이 올바르지 않습니다.";
-      case "auth/user-not-found":
-        return "해당 이메일로 가입된 계정을 찾을 수 없습니다.";
-      case "auth/wrong-password":
-        return "비밀번호가 올바르지 않습니다.";
-      case "auth/invalid-credential":
-        return "이메일 또는 비밀번호가 올바르지 않습니다.";
-      case "auth/email-already-in-use":
-        return "이미 가입된 이메일입니다.";
-      case "auth/weak-password":
-        return "비밀번호가 너무 약합니다. 6자 이상으로 설정해 주세요.";
-      case "auth/too-many-requests":
-        return "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.";
-      case "auth/operation-not-allowed":
-        return "현재 로그인 방식이 비활성화되어 있습니다. (Firebase 콘솔에서 Email/Password 로그인을 활성화해 주세요.)";
-      case "auth/network-request-failed":
-        return "네트워크 요청에 실패했습니다. 인터넷 연결 또는 보안 설정을 확인해 주세요.";
-      case "auth/invalid-api-key":
-        return "Firebase API Key가 올바르지 않습니다. 환경변수(.env.local) 설정을 확인해 주세요.";
-      case "auth/app-not-authorized":
-        return "현재 도메인이 Firebase에서 허용되지 않았습니다. (Authorized domains에 localhost 또는 배포 도메인을 추가해 주세요.)";
-      default:
-        return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  const parseSupabaseError = (message?: string) => {
+    const msg = (message || "").toLowerCase();
+
+    if (
+      msg.includes("invalid login credentials") ||
+      msg.includes("email not confirmed")
+    ) {
+      if (msg.includes("email not confirmed")) {
+        return "이메일 인증이 완료되지 않았습니다. 메일함에서 인증을 완료해 주세요.";
+      }
+      return "이메일 또는 비밀번호가 올바르지 않습니다.";
     }
+
+    if (msg.includes("user already registered")) {
+      return "이미 가입된 이메일입니다.";
+    }
+
+    if (msg.includes("password should be at least")) {
+      return "비밀번호가 너무 짧습니다. 6자 이상으로 입력해 주세요.";
+    }
+
+    if (msg.includes("unable to validate email address")) {
+      return "이메일 형식이 올바르지 않습니다.";
+    }
+
+    if (msg.includes("signup is disabled")) {
+      return "현재 회원가입이 비활성화되어 있습니다. Supabase Auth 설정을 확인해 주세요.";
+    }
+
+    if (msg.includes("network")) {
+      return "네트워크 요청에 실패했습니다. 인터넷 연결을 확인해 주세요.";
+    }
+
+    return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
 
-    if (!signInEmail.trim() || !signInPassword.trim()) {
+    const email = signInEmail.trim().toLowerCase();
+    const password = signInPassword.trim();
+
+    if (!email || !password) {
       window.alert("이메일과 비밀번호를 입력해 주세요.");
       return;
     }
@@ -96,13 +99,39 @@ export default function LandingPage() {
     try {
       setIsLoading(true);
 
-      await signInWithEmailAndPassword(auth, signInEmail, signInPassword);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) throw sessionError;
+
+      if (!session?.access_token) {
+        throw new Error(
+          "로그인은 되었지만 access token을 가져오지 못했습니다.",
+        );
+      }
+
+      // 로그인 직후 profiles 자동 생성/보정
+      await fetch("/api/profile/bootstrap", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       window.alert("로그인되었습니다.");
       router.push("/home");
     } catch (err: any) {
-      console.error("FIREBASE_AUTH_ERROR:", err?.code, err?.message, err);
-      window.alert(parseAuthError(err?.code));
+      console.error("SUPABASE_SIGNIN_ERROR:", err?.message, err);
+      window.alert(err?.message || "로그인에 실패했습니다.");
     } finally {
       setIsLoading(false);
     }
@@ -112,25 +141,23 @@ export default function LandingPage() {
     e.preventDefault();
     if (isLoading) return;
 
-    if (
-      !signUpEmail.trim() ||
-      !signUpPassword.trim() ||
-      !signUpPassword2.trim()
-    ) {
+    const email = signUpEmail.trim().toLowerCase();
+    const password = signUpPassword.trim();
+    const password2 = signUpPassword2.trim();
+
+    if (!email || !password || !password2) {
       window.alert("이메일, 비밀번호, 비밀번호 확인을 모두 입력해 주세요.");
       return;
     }
 
-    const formatCheck = checkEmailFormatOnly(signUpEmail);
+    const formatCheck = checkEmailFormatOnly(email);
     if (!formatCheck.ok) {
       window.alert("이메일 형식이 올바르지 않습니다.");
       return;
     }
 
-    if (signUpPassword !== signUpPassword2) {
-      window.alert(
-        "비밀번호와 비밀번호 확인이 일치하지 않습니다. 다시 확인해 주세요.",
-      );
+    if (password !== password2) {
+      window.alert("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
       return;
     }
 
@@ -143,27 +170,42 @@ export default function LandingPage() {
       setIsLoading(true);
       setEmailCheckStatus("checking");
 
-      await createUserWithEmailAndPassword(auth, signUpEmail, signUpPassword);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
 
       setEmailCheckStatus("available");
-      window.alert("회원가입이 완료되었습니다. 이제 로그인해 주세요.");
+
+      // 이메일 인증이 꺼져 있으면 세션이 있을 수 있음
+      if (data.session?.access_token) {
+        await fetch("/api/profile/bootstrap", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${data.session.access_token}`,
+          },
+        });
+      }
+
+      if (!data.session) {
+        window.alert(
+          "회원가입이 완료되었습니다. 이메일 인증 후 로그인해 주세요.",
+        );
+      } else {
+        window.alert("회원가입이 완료되었습니다. 이제 로그인해 주세요.");
+      }
 
       setMode("signin");
-      setSignInEmail(signUpEmail);
+      setSignInEmail(email);
       setSignInPassword("");
       setSignUpPassword("");
       setSignUpPassword2("");
       setAgreedTos(false);
     } catch (err: any) {
-      console.error("FIREBASE_AUTH_ERROR:", err?.code, err?.message, err);
-
-      if (err?.code === "auth/email-already-in-use")
-        setEmailCheckStatus("taken");
-      else if (err?.code === "auth/invalid-email")
-        setEmailCheckStatus("invalid");
-      else setEmailCheckStatus("idle");
-
-      window.alert(parseAuthError(err?.code));
+      console.error("SUPABASE_SIGNUP_ERROR:", err?.message, err);
+      window.alert(err?.message || "회원가입에 실패했습니다.");
     } finally {
       setIsLoading(false);
     }
@@ -171,7 +213,6 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0B1420] flex flex-col items-center justify-center text-white px-4">
-      {/* Logo */}
       <div className="mb-8">
         <Image
           src="/images/logo1.png"
@@ -182,9 +223,7 @@ export default function LandingPage() {
         />
       </div>
 
-      {/* Panel */}
       <div className="w-full max-w-sm rounded-2xl border border-slate-800/70 bg-[#0F1A2A]/70 p-5 shadow-[0_14px_48px_rgba(0,0,0,0.35)]">
-        {/* Buttons */}
         <div className="space-y-3">
           <button
             onClick={() => setMode((m) => (m === "signin" ? "none" : "signin"))}
@@ -205,7 +244,6 @@ export default function LandingPage() {
           </button>
         </div>
 
-        {/* Sign in Form */}
         <div
           className={`overflow-hidden transition-all duration-300 ${
             mode === "signin"
@@ -257,7 +295,6 @@ export default function LandingPage() {
           </form>
         </div>
 
-        {/* Sign up Form */}
         <div
           className={`overflow-hidden transition-all duration-300 ${
             mode === "signup"
@@ -291,7 +328,8 @@ export default function LandingPage() {
                 )}
                 {emailCheckStatus === "available" && (
                   <span className="text-emerald-300">
-                    이메일 형식이 정상입니다. 가입 시 중복 여부가 확인됩니다.
+                    이메일 형식이 정상입니다. 가입 시 가입 가능 여부가
+                    확인됩니다.
                   </span>
                 )}
                 {emailCheckStatus === "taken" && (
@@ -378,7 +416,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* Footer */}
       <p className="mt-6 text-xs text-slate-500 text-center leading-relaxed">
         © {year} 2K Quant. AI-Driven Quantitative Trading Platform. All rights
         reserved.

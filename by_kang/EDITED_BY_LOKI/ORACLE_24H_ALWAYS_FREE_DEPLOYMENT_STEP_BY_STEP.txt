@@ -1,0 +1,1108 @@
+Oracle Cloud Always Free 24시간 구동 배포 절차서
+================================================
+
+프로젝트: EDITED_BY_LOKI AI Quant Trading System
+대상: 클라우드를 처음 사용하는 사람
+목표: Oracle Cloud Always Free를 사용해 앱을 24시간 구동하기
+기준 화면: Oracle Cloud 콘솔 한글 UI
+
+참고:
+오라클 콘솔은 일부 항목이 한글과 영어가 섞여 보일 수 있습니다.
+이 문서에서는 먼저 한글 메뉴명을 쓰고, 헷갈릴 수 있는 곳은 영문명을 괄호로 같이 적었습니다.
+
+0. 먼저 알아야 할 것
+--------------------
+
+이 문서는 AWS가 아니라 Oracle Cloud Infrastructure, 줄여서 OCI 기준입니다.
+
+Oracle을 추천하는 이유는 이 프로젝트처럼 "작은 서버를 24시간 켜두는 용도"에 Always Free가 더 잘 맞기 때문입니다.
+
+Oracle 공식 문서 기준:
+
+- Oracle Cloud Free Tier에는 30일 무료 체험 크레딧과 Always Free 리소스가 있습니다.
+- Always Free 리소스는 기간 제한 없이 사용할 수 있습니다.
+- Free Trial이 끝나도 Always Free 리소스는 계속 사용할 수 있습니다.
+- Ampere A1 Compute는 Always Free 범위 안에서 총 4 OCPU / 24GB 메모리까지 사용할 수 있습니다.
+- 단, 리전 재고 부족이나 계정 유휴 판단으로 인한 중지/회수 가능성은 있습니다.
+
+중요:
+
+1. Oracle도 카드 인증이 필요할 수 있습니다.
+2. Always Free 한도를 넘기면 비용이 생길 수 있습니다.
+3. 유료 리소스를 만들면 비용이 생길 수 있습니다.
+4. 가입할 때 선택한 Home Region이 중요합니다.
+5. Ampere A1 무료 인스턴스는 리전 재고가 없으면 생성이 실패할 수 있습니다.
+
+공식 문서:
+
+- Oracle Cloud Free Tier
+  https://www.oracle.com/cloud/free/
+
+- Oracle Cloud Infrastructure Free Tier
+  https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm
+
+- Oracle Cloud Price List
+  https://www.oracle.com/cloud/price-list/
+
+
+1. 이 앱이 Oracle 서버에서 하는 일
+----------------------------------
+
+앱은 서버에서 다음 일을 합니다.
+
+1. Flask API를 8000번 포트로 실행합니다.
+2. `Low_conf.pkl` 모델을 로드합니다.
+3. `ccxt`로 업비트 1분봉 OHLCV 데이터를 가져옵니다.
+4. `quant_app/realtime_model.py`로 실시간 피처를 만듭니다.
+5. `model.predict_signal(..., horizon="short_30m")`로 추론합니다.
+6. 선택적으로 모의투자 루프를 60초마다 실행합니다.
+7. 선택적으로 텔레그램 알림을 보냅니다.
+
+이 앱에는 필요 없는 것:
+
+- Oracle Database 필요 없음
+- Autonomous Database 필요 없음
+- Load Balancer 필요 없음
+- Kubernetes 필요 없음
+- Object Storage 필요 없음
+- 고정 IP 필수 아님
+
+
+2. 무료로 유지하기 위한 원칙
+----------------------------
+
+원칙 1. Always Free 리소스만 사용합니다.
+
+권장 인스턴스:
+
+- Shape: VM.Standard.A1.Flex
+- CPU: 1 OCPU 또는 2 OCPU
+- Memory: 6GB 또는 12GB
+- OS: Ubuntu 22.04 또는 Ubuntu 24.04
+- Boot Volume: 기본값 또는 50GB 이하 권장
+
+이 프로젝트는 1 OCPU / 6GB로도 충분할 가능성이 높습니다.
+Docker 빌드까지 서버에서 할 생각이면 2 OCPU / 12GB가 더 편합니다.
+
+Always Free 총 한도:
+
+- Ampere A1 총합 4 OCPU
+- Ampere A1 총합 24GB 메모리
+
+즉, 예를 들어 아래처럼 쓸 수 있습니다.
+
+- 1대: 2 OCPU / 12GB
+- 1대: 1 OCPU / 6GB
+- 2대: 각각 1 OCPU / 6GB
+
+원칙 2. 만들면 안 되는 것
+
+- 유료 Compute Shape
+- GPU 인스턴스
+- Load Balancer
+- NAT Gateway
+- 유료 Database
+- 큰 Block Volume
+- 추가 Public IP
+- 유료 Monitoring/Logging 과다 사용
+
+원칙 3. 서버는 하나만 만듭니다.
+
+처음에는 인스턴스 1개만 만드세요.
+
+원칙 4. 보안 규칙은 좁게 엽니다.
+
+열 포트:
+
+- SSH 22번: 내 IP만
+- 앱 8000번: 내 IP만
+
+원칙 5. 비용 확인은 처음 3일간 매일 합니다.
+
+Oracle Cloud 콘솔 한글 UI에서 확인:
+
+- 청구 및 비용 관리
+- 비용 분석
+- 사용량
+- 컴퓨트 > 인스턴스
+- 블록 스토리지 > 블록 볼륨
+- 네트워킹 > 공용 IP
+
+
+3. Oracle Cloud 계정 만들기
+---------------------------
+
+1. 아래 주소로 이동합니다.
+
+   https://www.oracle.com/cloud/free/
+
+2. `Start for free` 또는 `Sign Up for Free Cloud Tier`를 클릭합니다.
+
+3. 계정 정보를 입력합니다.
+
+4. Home Region을 선택합니다.
+
+중요:
+
+Home Region은 신중히 선택해야 합니다.
+Oracle 공식 문서에 따르면 Always Free Compute 인스턴스는 Home Region에서 만들 수 있습니다.
+
+한국 사용자라면 보통 아래 중 하나를 고려합니다.
+
+- South Korea Central, Seoul
+- Japan East, Tokyo
+- Japan Central, Osaka
+
+주의:
+
+서울 리전에 Ampere A1 재고가 없을 수 있습니다.
+재고가 없으면 인스턴스 생성이 실패합니다.
+처음 가입 때 선택한 Home Region을 쉽게 바꾸기 어렵기 때문에, 가능하면 가입 전 현재 사용 가능한 리전을 확인하세요.
+
+5. 카드 인증을 진행합니다.
+
+Oracle 공식 문서에 따르면 카드 정보는 계정 생성과 본인 확인에 사용되며, 유료 계정으로 업그레이드하지 않으면 청구되지 않는다고 안내합니다.
+
+6. 계정 생성이 끝나면 Oracle Cloud Console에 로그인합니다.
+
+
+4. 비용/유료 전환 주의
+-----------------------
+
+Oracle은 Free Trial 이후에도 Always Free 리소스가 남을 수 있습니다.
+하지만 유료 리소스를 만들거나 Pay As You Go로 업그레이드하면 비용이 발생할 수 있습니다.
+
+처음에는 업그레이드하지 마세요.
+
+확인할 것:
+
+- 계정이 Free Tier 상태인지 확인
+- Pay As You Go 업그레이드를 누르지 않기
+- Always Free 딱지가 붙은 리소스만 만들기
+
+비용 확인 위치:
+
+Oracle Cloud 콘솔 > 청구 및 비용 관리 > 비용 분석
+
+
+5. VCN 네트워크 만들기
+----------------------
+
+VCN은 AWS의 VPC와 비슷한 가상 네트워크입니다.
+
+가장 쉬운 방법:
+
+1. Oracle Cloud 콘솔 왼쪽 위의 메뉴 버튼을 엽니다.
+2. `네트워킹`으로 이동합니다.
+3. `가상 클라우드 네트워크`를 클릭합니다.
+   - 화면에 영어가 보이면 `Virtual cloud networks`입니다.
+4. `VCN 마법사 시작`을 클릭합니다.
+   - 화면에 영어가 보이면 `Start VCN Wizard`입니다.
+5. `인터넷 연결로 VCN 생성`을 선택합니다.
+   - 화면에 영어가 보이면 `Create VCN with Internet Connectivity`입니다.
+6. 이름:
+
+   quant-vcn
+
+7. 기본값을 유지합니다.
+8. 생성합니다.
+
+생성되는 것:
+
+- VCN
+- 공용 서브넷
+- Internet Gateway
+- Route Table
+- 보안 목록
+
+이 구성은 SSH 접속과 앱 테스트에 가장 쉽습니다.
+
+
+6. 보안 규칙 열기
+-----------------
+
+기본 VCN 마법사를 썼다면 보안 목록(Security List)이 만들어져 있습니다.
+여기에 8000번 포트를 추가해야 합니다.
+
+1. Oracle Cloud 콘솔 > 네트워킹 > 가상 클라우드 네트워크
+2. `quant-vcn` 선택
+3. 왼쪽 또는 하단에서 `보안 목록` 선택
+   - 화면에 영어가 보이면 `Security Lists`입니다.
+4. 기본 보안 목록 선택
+   - 화면에 영어가 보이면 `Default Security List`입니다.
+5. `수신 규칙 추가` 클릭
+   - 화면에 영어가 보이면 `Add Ingress Rules`입니다.
+
+SSH 22번은 기본으로 열려 있을 수 있습니다.
+없다면 아래처럼 추가합니다.
+
+SSH 규칙:
+
+- Source CIDR: 내 IP/32
+- IP Protocol: TCP
+- Destination Port Range: 22
+
+앱 8000번 규칙:
+
+- Source CIDR: 내 IP/32
+- IP Protocol: TCP
+- Destination Port Range: 8000
+
+내 IP 확인 방법:
+
+브라우저에서 아래 검색:
+
+   what is my ip
+
+예를 들어 내 IP가 `1.2.3.4`라면:
+
+   1.2.3.4/32
+
+주의:
+
+처음부터 `0.0.0.0/0`으로 열지 마세요.
+8000번을 전 세계에 열면 보안상 위험합니다.
+
+
+7. 컴퓨트 인스턴스 만들기
+--------------------------
+
+1. Oracle Cloud 콘솔 왼쪽 위의 메뉴 버튼을 엽니다.
+2. `컴퓨트` > `인스턴스`로 이동합니다.
+   - 화면에 영어가 보이면 `Compute` > `Instances`입니다.
+3. `인스턴스 생성`을 클릭합니다.
+   - 화면에 영어가 보이면 `Create instance`입니다.
+
+기본 정보:
+
+Name:
+
+   quant-free-24h
+
+Placement:
+
+   기본값 유지
+
+이미지:
+
+   Ubuntu 22.04 또는 Ubuntu 24.04
+
+Shape:
+
+   한글 UI에서는 `Shape`, `구성`, 또는 `인스턴스 구성`처럼 보일 수 있습니다.
+   여기에서 인스턴스 종류를 바꿉니다.
+
+   VM.Standard.A1.Flex
+
+CPU/Memory:
+
+처음 추천:
+
+   1 OCPU
+   6 GB memory
+
+Docker 빌드가 걱정되면:
+
+   2 OCPU
+   12 GB memory
+
+Always Free 한도 안에서만 설정하세요.
+
+네트워킹:
+
+- VCN: quant-vcn
+- 서브넷: 공용 서브넷
+- 공용 IPv4 주소: 공용 IPv4 주소 지정
+
+SSH 키:
+
+가장 쉬운 방법:
+
+1. `Generate a key pair for me` 선택
+2. Private key 다운로드
+3. 예를 들어 아래에 저장
+
+   C:\Quant\keys\oracle-quant-key.key
+
+Boot Volume:
+
+기본값 유지.
+처음에는 크게 키우지 마세요.
+
+마지막으로:
+
+   생성
+
+
+7-1. 웹 콘솔 대신 OCI CLI로 인스턴스 생성하기
+-------------------------------------------
+
+웹 콘솔이 답답하면 OCI CLI로 같은 작업을 할 수 있습니다.
+다만 CLI도 Oracle의 실제 A1 재고 부족을 없애지는 못합니다.
+장점은 가용성 도메인별 재시도를 빠르게 할 수 있다는 점입니다.
+
+주의:
+
+- CLI로 해도 `VM.Standard.A1.Flex` 용량이 없으면 똑같이 실패합니다.
+- `결함 도메인`은 지정하지 않습니다. CLI 명령에서 `--fault-domain`을 넣지 않으면 Oracle이 자동 선택합니다.
+- `용량 예약`, `전용 호스트`, 유료 Shape는 쓰지 않습니다.
+- 아래 명령은 Windows PowerShell 기준입니다.
+
+공식 문서:
+
+- OCI CLI 설치/설정
+  https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
+
+- 인스턴스 생성 CLI 명령
+  https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/cmdref/compute/instance/launch.html
+
+1. OCI CLI 설치
+
+PowerShell을 관리자 권한으로 엽니다.
+
+   Set-ExecutionPolicy RemoteSigned
+
+OCI CLI 설치 스크립트를 내려받습니다.
+
+   Invoke-WebRequest https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.ps1 -OutFile install.ps1
+
+설치합니다.
+
+   .\install.ps1 -AcceptAllDefaults
+
+PowerShell을 새로 열고 설치 확인:
+
+   oci --version
+
+2. OCI CLI 초기 설정
+
+아래 명령 실행:
+
+   oci setup config
+
+물어보는 값:
+
+- User OCID
+- Tenancy OCID
+- Region
+- API key 저장 위치
+
+Region은 현재 Home Region에 맞춥니다.
+서울이면 보통 아래 값입니다.
+
+   ap-seoul-1
+
+명령이 끝나면 API 공개키를 Oracle 콘솔에 등록해야 합니다.
+
+Oracle Cloud 콘솔 한글 UI:
+
+1. 오른쪽 위 사람 아이콘 또는 프로필 메뉴
+2. 내 프로파일
+3. API 키
+4. API 키 추가
+5. 공개 키 붙여넣기 또는 업로드
+
+`oci setup config`가 만든 공개키 파일은 보통 아래 위치에 있습니다.
+
+   C:\Users\사용자명\.oci\oci_api_key_public.pem
+
+3. 필요한 OCID 값 준비
+
+PowerShell에서 아래처럼 값을 저장합니다.
+`<...>` 부분은 본인 값으로 바꿉니다.
+
+   $env:TENANCY_OCID = "<tenancy_ocid>"
+   $env:COMPARTMENT_OCID = "<compartment_ocid>"
+
+루트 컴파트먼트에 만들 거면 보통 `COMPARTMENT_OCID`는 `TENANCY_OCID`와 같습니다.
+
+4. 가용성 도메인 전체 이름 확인
+
+중요:
+CLI에서는 `AD-1`만 쓰면 안 됩니다.
+아래 명령으로 나오는 전체 이름을 복사해야 합니다.
+
+   oci iam availability-domain list `
+     --compartment-id "$env:TENANCY_OCID" `
+     --query "data[].name" `
+     --output table
+
+예시 형태:
+
+   xxxx:AP-SEOUL-1-AD-1
+   xxxx:AP-SEOUL-1-AD-2
+   xxxx:AP-SEOUL-1-AD-3
+
+AD-1이 실패하면 AD-2 또는 AD-3 전체 이름을 사용합니다.
+
+   $env:AD_NAME = "xxxx:AP-SEOUL-1-AD-2"
+
+AD-1만 보이면 그 리전에서는 바꿀 수 있는 가용성 도메인이 없는 상태일 수 있습니다.
+
+5. VCN과 서브넷 OCID 확인
+
+VCN 목록 보기:
+
+   oci network vcn list `
+     --compartment-id "$env:COMPARTMENT_OCID" `
+     --query "data[].{name:\"display-name\",id:id}" `
+     --output table
+
+`quant-vcn`의 OCID를 복사합니다.
+
+   $env:VCN_OCID = "<quant-vcn_ocid>"
+
+서브넷 목록 보기:
+
+   oci network subnet list `
+     --compartment-id "$env:COMPARTMENT_OCID" `
+     --vcn-id "$env:VCN_OCID" `
+     --query "data[].{name:\"display-name\",id:id}" `
+     --output table
+
+`퍼블릭 서브넷-quant-vcn` 또는 public subnet에 해당하는 OCID를 복사합니다.
+
+   $env:SUBNET_OCID = "<public_subnet_ocid>"
+
+6. Ubuntu 22.04 이미지 OCID 찾기
+
+   $env:IMAGE_ID = (oci compute image list `
+     --compartment-id "$env:COMPARTMENT_OCID" `
+     --operating-system "Canonical Ubuntu" `
+     --operating-system-version "22.04" `
+     --shape "VM.Standard.A1.Flex" `
+     --sort-by TIMECREATED `
+     --sort-order DESC `
+     --query "data[0].id" `
+     --raw-output)
+
+확인:
+
+   echo $env:IMAGE_ID
+
+값이 `ocid1.image...`로 시작해야 합니다.
+
+7. SSH 키 파일 준비
+
+이미 SSH 키가 있으면 그 public key 파일을 씁니다.
+없으면 새로 만듭니다.
+
+   ssh-keygen -t rsa -b 2048 -f "$env:USERPROFILE\.ssh\oci_quant_key"
+
+사용할 공개키 파일:
+
+   C:\Users\사용자명\.ssh\oci_quant_key.pub
+
+주의:
+`.pub` 파일이 공개키입니다.
+확장자 없는 `oci_quant_key` 파일은 개인키이므로 다른 곳에 올리지 않습니다.
+
+8. CLI로 인스턴스 생성
+
+먼저 1 OCPU / 6GB로 시도합니다.
+
+   oci compute instance launch `
+     --availability-domain "$env:AD_NAME" `
+     --compartment-id "$env:COMPARTMENT_OCID" `
+     --display-name "quant-free-24h-cli" `
+     --image-id "$env:IMAGE_ID" `
+     --shape "VM.Standard.A1.Flex" `
+     --shape-config '{"ocpus": 1, "memoryInGBs": 6}' `
+     --subnet-id "$env:SUBNET_OCID" `
+     --assign-public-ip true `
+     --ssh-authorized-keys-file "$env:USERPROFILE\.ssh\oci_quant_key.pub" `
+     --boot-volume-size-in-gbs 50
+
+실패 메시지에 capacity, 용량 부족, AD-1 용량 부족이 나오면:
+
+1. `$env:AD_NAME`을 AD-2 또는 AD-3 전체 이름으로 바꿉니다.
+2. 같은 생성 명령을 다시 실행합니다.
+3. 그래도 실패하면 1 OCPU / 4GB로 낮춰 다시 시도합니다.
+
+1 OCPU / 4GB 명령에서 바뀌는 부분:
+
+   --shape-config '{"ocpus": 1, "memoryInGBs": 4}'
+
+9. 생성 확인
+
+   oci compute instance list `
+     --compartment-id "$env:COMPARTMENT_OCID" `
+     --query "data[].{name:\"display-name\",state:\"lifecycle-state\",id:id}" `
+     --output table
+
+상태가 `RUNNING`이면 생성 성공입니다.
+
+10. 공용 IP 확인
+
+인스턴스 OCID를 저장합니다.
+
+   $env:INSTANCE_OCID = "<instance_ocid>"
+
+VNIC attachment 확인:
+
+   $env:VNIC_ATTACHMENT_OCID = (oci compute vnic-attachment list `
+     --compartment-id "$env:COMPARTMENT_OCID" `
+     --instance-id "$env:INSTANCE_OCID" `
+     --query "data[0].id" `
+     --raw-output)
+
+VNIC OCID 확인:
+
+   $env:VNIC_OCID = (oci compute vnic-attachment get `
+     --vnic-attachment-id "$env:VNIC_ATTACHMENT_OCID" `
+     --query "data.\"vnic-id\"" `
+     --raw-output)
+
+공용 IP 확인:
+
+   oci network vnic get `
+     --vnic-id "$env:VNIC_OCID" `
+     --query "data.\"public-ip\"" `
+     --raw-output
+
+11. 접속
+
+공용 IP가 `1.2.3.4`라고 하면:
+
+   ssh -i "$env:USERPROFILE\.ssh\oci_quant_key" ubuntu@1.2.3.4
+
+
+7-2. 더 쉬운 방법: Oracle Cloud Shell에서 CLI 실행하기
+---------------------------------------------------
+
+Windows에 OCI CLI 설치가 막히면 Cloud Shell을 쓰는 것이 더 쉽습니다.
+Cloud Shell은 Oracle 콘솔 안에서 실행되는 터미널입니다.
+보통 OCI CLI가 이미 준비되어 있고, 현재 로그인한 계정 기준으로 명령을 실행할 수 있습니다.
+
+열기:
+
+1. Oracle Cloud 콘솔 오른쪽 위를 봅니다.
+2. `Cloud Shell` 아이콘을 누릅니다.
+   - 아이콘 모양은 보통 `>_` 터미널처럼 생겼습니다.
+3. 아래쪽에 검은색 터미널 창이 열릴 때까지 기다립니다.
+
+Cloud Shell에서 먼저 확인:
+
+   oci --version
+
+가용성 도메인 확인:
+
+   oci iam availability-domain list \
+     --compartment-id "<tenancy_ocid>" \
+     --query "data[].name" \
+     --output table
+
+`<tenancy_ocid>`는 테넌시 OCID입니다.
+루트 컴파트먼트에 인스턴스를 만들면 compartment OCID도 보통 tenancy OCID와 같습니다.
+
+Cloud Shell 방식의 장점:
+
+- 내 PC에 OCI CLI를 설치하지 않아도 됩니다.
+- API 키 등록을 따로 하지 않아도 되는 경우가 많습니다.
+- AD-1, AD-2, AD-3 재시도를 빠르게 할 수 있습니다.
+
+Cloud Shell 방식의 단점:
+
+- OCID 값을 직접 복사해야 합니다.
+- 명령어는 여전히 길고, A1 재고 부족은 해결하지 못합니다.
+
+Cloud Shell에서 인스턴스 생성 명령을 쓰려면 아래 값들이 필요합니다.
+
+- tenancy OCID
+- compartment OCID
+- AD 전체 이름
+- public subnet OCID
+- Ubuntu image OCID
+- SSH public key
+
+잘 모르겠으면 먼저 아래 3개만 확인해서 기록합니다.
+
+1. tenancy OCID
+2. compartment OCID
+3. AD 목록 출력 결과
+
+그 다음 단계부터는 명령어를 하나씩 맞춰 실행합니다.
+
+
+8. Windows에서 Oracle 서버 접속하기
+-----------------------------------
+
+Oracle Ubuntu 인스턴스의 기본 사용자 이름은 보통 `ubuntu`입니다.
+
+PowerShell을 엽니다.
+
+키 폴더로 이동:
+
+   cd C:\Quant\keys
+
+키 권한 제한:
+
+   icacls .\oracle-quant-key.key /inheritance:r
+   icacls .\oracle-quant-key.key /grant:r "$env:USERNAME:R"
+
+접속:
+
+   ssh -i .\oracle-quant-key.key ubuntu@YOUR_ORACLE_PUBLIC_IP
+
+예시:
+
+   ssh -i .\oracle-quant-key.key ubuntu@140.238.10.20
+
+처음 접속할 때 물어보면:
+
+   yes
+
+
+9. 서버에 Docker 설치하기
+-------------------------
+
+아래 명령은 Oracle 서버 안에서 실행합니다.
+
+   sudo apt update
+   sudo apt upgrade -y
+   sudo apt install -y docker.io unzip
+   sudo systemctl enable --now docker
+   sudo usermod -aG docker ubuntu
+
+로그아웃:
+
+   exit
+
+다시 접속:
+
+   ssh -i .\oracle-quant-key.key ubuntu@YOUR_ORACLE_PUBLIC_IP
+
+Docker 확인:
+
+   docker --version
+
+
+10. 내 PC에서 프로젝트 업로드하기
+---------------------------------
+
+Windows PowerShell에서 실행합니다.
+
+   cd C:\Quant\by_kang
+
+프로젝트 압축:
+
+   Compress-Archive -Path .\EDITED_BY_LOKI\* -DestinationPath .\edited_by_loki.zip -Force
+
+Oracle 서버로 업로드:
+
+   scp -i C:\Quant\keys\oracle-quant-key.key .\edited_by_loki.zip ubuntu@YOUR_ORACLE_PUBLIC_IP:~/
+
+Oracle 서버에서 압축 풀기:
+
+   unzip -o edited_by_loki.zip -d EDITED_BY_LOKI
+   cd EDITED_BY_LOKI
+
+필수 파일 확인:
+
+   ls -lh
+   ls -lh Low_conf.pkl
+   ls -lh quant_app/realtime_model.py
+   ls -lh Dockerfile
+
+
+11. .env 만들기
+---------------
+
+Oracle 서버에서 실행합니다.
+
+   cd ~/EDITED_BY_LOKI
+   cp .env.example .env
+   nano .env
+
+최소 권장 설정:
+
+   MODEL_FILE=Low_conf.pkl
+   DEBUG=False
+   HOST=0.0.0.0
+   PORT=8000
+
+   BASE_THRESHOLD=0.60
+   INITIAL_CAPITAL=5000000
+   PAPER_TRADING_ENABLED=True
+   SIMULATION_INTERVAL_SECONDS=60
+   TAKE_PROFIT=0.02
+   STOP_LOSS=-0.03
+   MAX_HOLD_MINUTES=30
+
+   TELEGRAM_BOT_TOKEN=
+   TELEGRAM_CHAT_ID=
+   TELEGRAM_CHANNEL=
+
+텔레그램을 쓸 경우:
+
+   TELEGRAM_BOT_TOKEN=실제_토큰
+   TELEGRAM_CHAT_ID=실제_chat_id
+
+주의:
+
+- 실제 토큰을 README나 `.env.example`에 넣지 마세요.
+- `.env`는 서버에만 둡니다.
+- 값에 따옴표를 붙이지 마세요.
+
+nano 저장:
+
+   Ctrl + O
+   Enter
+   Ctrl + X
+
+
+12. Docker 이미지 빌드하기
+--------------------------
+
+Oracle 서버에서 실행합니다.
+
+   cd ~/EDITED_BY_LOKI
+   docker build -t quant-trading:latest .
+
+주의:
+
+Oracle Ampere A1은 ARM64 서버입니다.
+현재 Dockerfile의 `python:3.11-slim`은 ARM64 이미지를 지원하므로 기본적으로 동작해야 합니다.
+
+다만 Python 패키지 중 ARM64 wheel이 없으면 빌드가 오래 걸릴 수 있습니다.
+그래서 1 OCPU / 6GB에서 빌드가 느리면 2 OCPU / 12GB로 만드는 것이 편합니다.
+
+
+13. 컨테이너 24시간 실행하기
+----------------------------
+
+Oracle 서버에서 실행합니다.
+
+   docker run -d \
+     --name quant-trading \
+     --restart unless-stopped \
+     -p 8000:8000 \
+     --env-file .env \
+     quant-trading:latest
+
+상태 확인:
+
+   docker ps
+   docker logs --tail 100 quant-trading
+
+서버 안에서 health 확인:
+
+   curl http://localhost:8000/health
+
+서버 안에서 signal 확인:
+
+   curl http://localhost:8000/signal
+
+내 PC에서 확인:
+
+   curl http://YOUR_ORACLE_PUBLIC_IP:8000/health
+
+만약 서버 안에서는 되는데 내 PC에서는 안 되면:
+
+1. Oracle 보안 목록(Security List)에서 8000번 포트가 열렸는지 확인
+2. Source CIDR이 내 IP/32인지 확인
+3. Ubuntu 방화벽이 켜져 있는지 확인
+
+Ubuntu 방화벽 확인:
+
+   sudo ufw status
+
+보통 기본은 inactive입니다.
+만약 active라면:
+
+   sudo ufw allow 8000/tcp
+
+
+14. 모의투자 시작하기
+---------------------
+
+`PAPER_TRADING_ENABLED=True`이면 모의투자 엔진은 생성됩니다.
+하지만 자동 루프는 `/paper/start`를 호출해야 시작됩니다.
+
+서버에서 실행:
+
+   curl -X POST http://localhost:8000/paper/start
+
+상태 확인:
+
+   curl http://localhost:8000/paper/status
+
+로그 보기:
+
+   docker logs -f quant-trading
+
+모의투자 중지:
+
+   curl -X POST http://localhost:8000/paper/stop
+
+
+15. 재부팅 후 자동 재시작 확인하기
+----------------------------------
+
+컨테이너는 아래 옵션으로 실행했습니다.
+
+   --restart unless-stopped
+
+재부팅:
+
+   sudo reboot
+
+1~2분 기다립니다.
+
+다시 접속:
+
+   ssh -i .\oracle-quant-key.key ubuntu@YOUR_ORACLE_PUBLIC_IP
+
+확인:
+
+   docker ps
+   docker logs --tail 100 quant-trading
+
+
+16. 매일 확인할 것
+------------------
+
+처음 3일은 매일 확인하세요.
+
+Oracle Cloud 콘솔 한글 UI에서 확인:
+
+1. 청구 및 비용 관리
+2. 비용 분석
+3. 컴퓨트 > 인스턴스
+4. 블록 스토리지 > 블록 볼륨
+5. 네트워킹 > 공용 IP
+
+정상 상태:
+
+- 컴퓨트 인스턴스 1개
+- Shape가 VM.Standard.A1.Flex
+- OCPU/Memory가 Always Free 한도 안
+- Block Volume이 과도하게 크지 않음
+- Load Balancer 없음
+- Database 없음
+- NAT Gateway 없음
+
+이상한 비용이 보이면:
+
+1. 인스턴스 중지
+2. 비용 분석 확인
+3. 유료 리소스가 생겼는지 확인
+4. 필요 없으면 삭제
+
+
+17. 완전히 중지/삭제하는 방법
+-----------------------------
+
+잠시 멈추기:
+
+Oracle Cloud 콘솔 > 컴퓨트 > 인스턴스 > 인스턴스 선택 > 중지
+
+완전히 삭제:
+
+1. 컴퓨트 > 인스턴스 > 인스턴스 선택 > 종료
+2. Boot Volume을 같이 삭제할지 묻는 옵션 확인
+3. 블록 스토리지 > 블록 볼륨에서 남은 볼륨 삭제
+4. 네트워킹 > 공용 IP에서 사용하지 않는 IP 확인
+5. Load Balancer, Database, Object Storage를 만들었다면 삭제
+
+
+18. 문제 해결
+-------------
+
+문제: 인스턴스 생성에서 용량 부족 / Out of capacity가 뜹니다.
+
+원인:
+
+Ampere A1 Always Free 재고가 부족할 수 있습니다.
+아래와 같은 메시지가 나올 수 있습니다.
+
+   VM.Standard.A1.Flex에서 AD-1 구성에 대한 용량이 부족합니다.
+   다른 가용성 도메인에 인스턴스를 생성하거나 나중에 다시 시도하십시오.
+   결함 도메인을 지정한 경우 결함 도메인을 지정하지 않고 인스턴스를 생성해 보십시오.
+
+해결:
+
+1. 결함 도메인을 지정하지 않습니다.
+
+   인스턴스 생성 화면에서 `고급 옵션 표시` 또는 비슷한 항목을 열어봅니다.
+   `결함 도메인` 항목이 있으면 특정 FD-1, FD-2, FD-3을 고르지 말고 자동/선택 안 함 상태로 둡니다.
+
+2. 가용성 도메인을 바꿔 봅니다.
+
+   인스턴스 생성 화면에서 `가용성 도메인` 항목이 보이면 AD-1 말고 AD-2 또는 AD-3을 선택해 다시 생성합니다.
+   화면에 가용성 도메인이 하나만 보이면 그 리전에서는 사용자가 직접 바꿀 수 있는 선택지가 없을 수 있습니다.
+
+3. 사양을 더 작게 낮춥니다.
+
+   먼저 아래처럼 최소 사양으로 시도합니다.
+
+   - Shape: VM.Standard.A1.Flex
+   - OCPU: 1
+   - 메모리: 6GB
+
+   이것도 실패하면 1 OCPU / 4GB도 시도할 수 있습니다.
+   단, Docker 빌드와 모델 로딩까지 생각하면 이 프로젝트는 1 OCPU / 6GB 이상을 권장합니다.
+
+4. 몇 시간 뒤 다시 시도합니다.
+
+   이 오류는 내 설정이 틀렸다는 뜻이 아니라 Oracle 쪽 무료 A1 서버 재고가 없다는 뜻인 경우가 많습니다.
+   같은 리전에서도 시간이 지나면 생성되는 경우가 있습니다.
+
+5. 유료 Shape로 바꾸지 않습니다.
+
+   `VM.Standard.E2`, `VM.Standard3`, `Standard.E4` 같은 다른 Shape가 생성 가능해 보여도 무료 목표라면 선택하지 마세요.
+   이 프로젝트의 무료 목표는 `VM.Standard.A1.Flex` 기준입니다.
+
+6. 그래도 안 되면 선택지는 제한됩니다.
+
+   Home Region을 이미 정했다면 쉽게 바꾸기 어렵습니다.
+   다른 리전으로 새 계정을 만드는 방식은 Oracle 정책 위반이 될 수 있으므로 권장하지 않습니다.
+   가장 안전한 방법은 같은 계정/같은 리전에서 AD 변경, 결함 도메인 자동, 작은 사양, 시간차 재시도입니다.
+
+현재 화면이 아래와 비슷한 경우:
+
+   가용성 도메인: AD-1
+   용량 유형: on-demand
+   결함 도메인: 오라클이 최적의 결함 도메인을 선택합니다.
+   구성: VM.Standard.A1.Flex
+   구성 빌드: 가상 머신, 1 코어 OCPU, 6GB 메모리
+   퍼블릭 IPv4 주소: 예
+
+판단:
+
+- 결함 도메인은 이미 올바릅니다. 따로 FD-1, FD-2, FD-3을 지정하지 않은 상태입니다.
+- 네트워킹도 `퍼블릭 IPv4 주소: 예`라서 SSH 접속용으로 맞습니다.
+- 문제는 설정 오류가 아니라 AD-1의 A1 서버 재고 부족입니다.
+
+바로 해볼 것:
+
+1. `이전`을 눌러 기본 정보 화면으로 돌아갑니다.
+2. `가용성 도메인` 선택지가 AD-2 또는 AD-3까지 있는지 확인합니다.
+3. AD-2 또는 AD-3이 보이면 바꾼 뒤 다시 `생성`합니다.
+4. AD-1만 보이면 같은 화면에서 바꿀 수 있는 가용성 도메인이 없는 것입니다.
+5. 이 경우 `구성`에서 OCPU 1, 메모리 4GB로 낮춰 한 번 더 시도합니다.
+6. 그래도 실패하면 설정을 더 건드리지 말고 몇 시간 뒤 같은 조건으로 다시 시도합니다.
+
+누르지 말 것:
+
+- `용량 예약`
+- `전용 가상 머신 호스트`
+- 유료 Shape
+- `스택으로 저장`
+
+`예상 비용 보기`는 눌러도 되지만, 무료 목표에서는 비용이 0원 또는 Always Free 범위인지 확인하는 용도로만 사용합니다.
+
+문제: SSH 접속이 안 됩니다.
+
+확인:
+
+- Public IP가 맞는지
+- 사용자 이름이 `ubuntu`인지
+- Security List에서 22번 포트가 내 IP에 열려 있는지
+- 키 파일 권한이 제한되어 있는지
+
+문제: Docker 빌드가 실패합니다.
+
+확인:
+
+   docker --version
+   free -h
+   df -h
+
+다시 시도:
+
+   docker system prune -f
+   docker build --no-cache -t quant-trading:latest .
+
+문제: 모델 로딩이 실패합니다.
+
+확인:
+
+   ls -lh Low_conf.pkl
+   ls -lh quant_app/realtime_model.py
+
+컨테이너 안에서 확인:
+
+   docker exec -it quant-trading python -c "import pickle; import quant_app.realtime_model; m=pickle.load(open('Low_conf.pkl','rb')); print(type(m).__name__)"
+
+문제: 업비트 API 호출이 실패합니다.
+
+컨테이너 안에서 확인:
+
+   docker exec -it quant-trading python -c "import ccxt; ex=ccxt.upbit(); data=ex.fetch_ohlcv('KRW-BTC', timeframe='1m', limit=5); print(len(data))"
+
+실패하면:
+
+- 서버의 외부 인터넷 접속 확인
+- VCN Route Table에 Internet Gateway 경로가 있는지 확인
+- Docker 컨테이너 로그 확인
+
+문제: 내 PC에서 8000번 접속이 안 됩니다.
+
+확인:
+
+1. 컨테이너가 실행 중인지
+
+   docker ps
+
+2. 서버 안에서는 되는지
+
+   curl http://localhost:8000/health
+
+3. Security List에 8000번이 열려 있는지
+
+4. 내 IP가 바뀌지 않았는지
+
+
+19. 밤새 켜두기 전 체크리스트
+-----------------------------
+
+[ ] 계정이 Oracle Free Tier 상태다.
+[ ] Pay As You Go로 업그레이드하지 않았다.
+[ ] 인스턴스 Shape가 VM.Standard.A1.Flex다.
+[ ] OCPU/Memory가 Always Free 한도 안이다.
+[ ] 컴퓨트 인스턴스는 1개만 만들었다.
+[ ] Load Balancer가 없다.
+[ ] Database가 없다.
+[ ] 큰 Block Volume을 만들지 않았다.
+[ ] Security List에서 22번은 내 IP만 허용한다.
+[ ] Security List에서 8000번은 내 IP만 허용한다.
+[ ] Docker 컨테이너가 `--restart unless-stopped`로 실행 중이다.
+[ ] `/health`가 정상 응답한다.
+[ ] `/signal`이 정상 응답한다.
+[ ] 모의투자를 쓸 경우 `/paper/status`가 정상 응답한다.
+[ ] Oracle 비용 분석을 확인할 줄 안다.
+[ ] 인스턴스 중지/종료 방법을 알고 있다.
+
+
+20. 명령어 요약
+---------------
+
+서버 접속:
+
+   ssh -i .\oracle-quant-key.key ubuntu@YOUR_ORACLE_PUBLIC_IP
+
+Docker 설치:
+
+   sudo apt update
+   sudo apt upgrade -y
+   sudo apt install -y docker.io unzip
+   sudo systemctl enable --now docker
+   sudo usermod -aG docker ubuntu
+   exit
+
+프로젝트 업로드 후 서버에서:
+
+   unzip -o edited_by_loki.zip -d EDITED_BY_LOKI
+   cd EDITED_BY_LOKI
+   cp .env.example .env
+   nano .env
+   docker build -t quant-trading:latest .
+   docker run -d --name quant-trading --restart unless-stopped -p 8000:8000 --env-file .env quant-trading:latest
+   curl http://localhost:8000/health
+   curl http://localhost:8000/signal
+   curl -X POST http://localhost:8000/paper/start
+   docker logs -f quant-trading
+
+
+끝.

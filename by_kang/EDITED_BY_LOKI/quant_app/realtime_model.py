@@ -89,6 +89,25 @@ REALTIME_FEATURE_COLUMNS = [
     "eth_ret_15m",
     "eth_ret_60m",
     "eth_volatility_30m",
+    "rsi_overbought",
+    "rsi_oversold",
+    "fomo_chase_score",
+    "capitulation_score",
+    "round_figure_distance",
+    "near_round_figure",
+    "liquidity_pool_pressure_up",
+    "liquidity_pool_pressure_down",
+    "stop_hunt_up",
+    "stop_hunt_down",
+    "us_session",
+    "asia_session",
+    "session_overlap",
+    "weekend_activity",
+    "btc_lead_lag_60m",
+    "alt_rotation_pressure",
+    "funding_rate",
+    "open_interest_change_60m",
+    "leverage_overheat",
     "hour_sin",
     "hour_cos",
     "dow_sin",
@@ -273,6 +292,7 @@ def build_realtime_features(
         df["btc_dominance_z_1440"] = (df["btc_dominance"] - dom_mean) / dom_std.replace(0, np.nan)
 
     df = _add_market_regime_features(df)
+    df = _add_behavioral_microstructure_features(df)
     df = _add_time_features(df)
 
     if include_target:
@@ -285,9 +305,15 @@ def build_realtime_features(
 
 def align_feature_frame(frame: pd.DataFrame, feature_columns: list[str] | None = None) -> pd.DataFrame:
     columns = feature_columns or REALTIME_FEATURE_COLUMNS
-    out = pd.DataFrame(index=frame.index)
-    for column in columns:
-        out[column] = pd.to_numeric(frame[column], errors="coerce") if column in frame.columns else np.nan
+    data = {
+        column: (
+            pd.to_numeric(frame[column], errors="coerce")
+            if column in frame.columns
+            else pd.Series(np.nan, index=frame.index)
+        )
+        for column in columns
+    }
+    out = pd.DataFrame(data, index=frame.index)
     out = out.replace([np.inf, -np.inf], np.nan)
     medians = out.median(numeric_only=True).replace([np.inf, -np.inf], np.nan).fillna(0.0)
     return out.fillna(medians).astype("float32")
@@ -345,12 +371,21 @@ def _standardize_columns(frame: pd.DataFrame) -> pd.DataFrame:
         "kimp_real",
         "market_fx",
         "btc_dominance",
+        "funding_rate",
+        "open_interest",
         "future_return",
     ]
     for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
-        elif col.endswith("_b") or col in {"taker_buy_base_volume", "kimp_real", "market_fx", "btc_dominance"}:
+        elif col.endswith("_b") or col in {
+            "taker_buy_base_volume",
+            "kimp_real",
+            "market_fx",
+            "btc_dominance",
+            "funding_rate",
+            "open_interest",
+        }:
             df[col] = np.nan
 
     if "kimp_real" in df.columns and df["kimp_real"].isna().all() and {"close_b", "market_fx"}.issubset(df.columns):
@@ -381,12 +416,90 @@ def _add_market_regime_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _add_behavioral_microstructure_features(df: pd.DataFrame) -> pd.DataFrame:
+    grouped = df.groupby("market", group_keys=False, sort=False)
+    close = df["close_u"].astype("float64")
+    high = df["high_u"].astype("float64")
+    low = df["low_u"].astype("float64")
+
+    rsi = pd.to_numeric(df.get("rsi_14", np.nan), errors="coerce")
+    df["rsi_overbought"] = ((rsi - 70.0) / 30.0).clip(lower=0.0, upper=1.0)
+    df["rsi_oversold"] = ((30.0 - rsi) / 30.0).clip(lower=0.0, upper=1.0)
+
+    volume_climax = np.log1p(pd.to_numeric(df.get("volume_rel_30", 0.0), errors="coerce").clip(lower=0.0))
+    upside_impulse = pd.to_numeric(df.get("ret_15m", 0.0), errors="coerce").clip(lower=0.0) * 100.0
+    downside_impulse = (-pd.to_numeric(df.get("ret_15m", 0.0), errors="coerce")).clip(lower=0.0) * 100.0
+    breakout = pd.to_numeric(df.get("breakout_20", 0.0), errors="coerce").fillna(0.0)
+    lower_wick = pd.to_numeric(df.get("lower_wick_pct", 0.0), errors="coerce").clip(lower=0.0)
+    upper_wick = pd.to_numeric(df.get("upper_wick_pct", 0.0), errors="coerce").clip(lower=0.0)
+
+    df["fomo_chase_score"] = (df["rsi_overbought"] * volume_climax * (1.0 + breakout) * (1.0 + upside_impulse)).clip(0.0, 10.0)
+    df["capitulation_score"] = (df["rsi_oversold"] * volume_climax * (1.0 + downside_impulse) * (1.0 + lower_wick)).clip(0.0, 10.0)
+
+    df["round_figure_distance"] = _round_figure_distance(close)
+    df["near_round_figure"] = (1.0 - (df["round_figure_distance"] / 0.003)).clip(lower=0.0, upper=1.0)
+
+    high_60_prev = grouped["high_u"].transform(lambda s: s.rolling(60, min_periods=20).max().shift(1))
+    low_60_prev = grouped["low_u"].transform(lambda s: s.rolling(60, min_periods=20).min().shift(1))
+    value_pressure = np.log1p(pd.to_numeric(df.get("value_rel_120", 0.0), errors="coerce").clip(lower=0.0))
+    dist_high_prev = (high_60_prev - close).abs() / close.replace(0, np.nan)
+    dist_low_prev = (close - low_60_prev).abs() / close.replace(0, np.nan)
+    df["liquidity_pool_pressure_up"] = (1.0 - (dist_high_prev / 0.01)).clip(0.0, 1.0) * value_pressure
+    df["liquidity_pool_pressure_down"] = (1.0 - (dist_low_prev / 0.01)).clip(0.0, 1.0) * value_pressure
+    df["stop_hunt_up"] = ((high > high_60_prev) & (close < high_60_prev)).astype("float32") * upper_wick * value_pressure
+    df["stop_hunt_down"] = ((low < low_60_prev) & (close > low_60_prev)).astype("float32") * lower_wick * value_pressure
+
+    btc_ret_60m = pd.to_numeric(df.get("btc_ret_60m", 0.0), errors="coerce")
+    ret_60m = pd.to_numeric(df.get("ret_60m", 0.0), errors="coerce")
+    is_alt = (~df["market"].astype(str).str.contains("BTC", case=False, na=False)).astype("float32")
+    df["btc_lead_lag_60m"] = (ret_60m - btc_ret_60m).fillna(0.0)
+    df["alt_rotation_pressure"] = (
+        is_alt
+        * btc_ret_60m.clip(lower=0.0)
+        * pd.to_numeric(df.get("volume_rel_120", 0.0), errors="coerce").clip(lower=0.0)
+    ).clip(0.0, 10.0)
+
+    if "funding_rate" not in df.columns:
+        df["funding_rate"] = 0.0
+    else:
+        df["funding_rate"] = pd.to_numeric(df["funding_rate"], errors="coerce").fillna(0.0)
+    if "open_interest" in df.columns and not df["open_interest"].isna().all():
+        df["open_interest_change_60m"] = grouped["open_interest"].pct_change(60, fill_method=None)
+    else:
+        df["open_interest_change_60m"] = 0.0
+    oi_change = pd.to_numeric(df["open_interest_change_60m"], errors="coerce").fillna(0.0)
+    df["leverage_overheat"] = (
+        (df["funding_rate"].clip(lower=0.0) / 0.01)
+        * oi_change.clip(lower=0.0)
+        * (1.0 + df["fomo_chase_score"])
+    ).clip(0.0, 10.0)
+    return df
+
+
+def _round_figure_distance(price: pd.Series) -> pd.Series:
+    clean = pd.to_numeric(price, errors="coerce").where(lambda s: s > 0)
+    magnitude = np.power(10.0, np.floor(np.log10(clean)))
+    scaled = clean / magnitude
+    candidates = pd.concat(
+        [((scaled - level).abs() / scaled).rename(str(level)) for level in (1.0, 2.0, 5.0, 10.0)],
+        axis=1,
+    )
+    return candidates.min(axis=1).clip(lower=0.0, upper=1.0)
+
+
 def _add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     ts = pd.to_datetime(df["timestamp_utc"], errors="coerce")
+    hour = ts.dt.hour
+    df["asia_session"] = hour.between(0, 8).astype("float32")
+    df["us_session"] = hour.between(13, 21).astype("float32")
+    df["session_overlap"] = hour.between(13, 16).astype("float32")
+    dow = ts.dt.dayofweek
+    weekend = dow.isin([5, 6]).astype("float32")
+    volume_rel = pd.to_numeric(df.get("volume_rel_120", 1.0), errors="coerce").fillna(1.0)
+    df["weekend_activity"] = weekend * np.log1p(volume_rel.clip(lower=0.0))
     minute_of_day = ts.dt.hour * 60 + ts.dt.minute
     df["hour_sin"] = np.sin(2 * np.pi * minute_of_day / 1440)
     df["hour_cos"] = np.cos(2 * np.pi * minute_of_day / 1440)
-    dow = ts.dt.dayofweek
     df["dow_sin"] = np.sin(2 * np.pi * dow / 7)
     df["dow_cos"] = np.cos(2 * np.pi * dow / 7)
     return df

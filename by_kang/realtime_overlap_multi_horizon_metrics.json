@@ -1,0 +1,695 @@
+{
+  "metadata": {
+    "created_at_local": "2026-06-23T14:01:24.832304",
+    "training_device": "cuda",
+    "inference_device": "cpu",
+    "model_family": "XGBoost histogram tree",
+    "scope": "Only coins present in both Upbit and Binance merged 1-minute data",
+    "source_files": {
+      "merged_parquet": "C:\\Quant\\master.parquet"
+    },
+    "source_meta": {
+      "load_mode": "overlap-only-merged-cache",
+      "full_min_timestamp": "2017-09-01 00:00:00",
+      "full_max_timestamp": "2026-02-26 05:49:00",
+      "four_year_cutoff": "2022-02-26 05:49:00",
+      "loaded_rows": 10702258,
+      "markets": [
+        "KRW-BTC",
+        "KRW-DOGE",
+        "KRW-ENSO",
+        "KRW-ETH",
+        "KRW-SOL",
+        "KRW-XRP"
+      ],
+      "binance_symbols": [
+        "BTCUSDT",
+        "DOGEUSDT",
+        "ENSOUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT"
+      ],
+      "row_groups": 32
+    },
+    "horizon_configs": {
+      "short_30m": {
+        "horizon_minutes": 30,
+        "min_return_bps": 12.0,
+        "fee_bps": 5.0
+      },
+      "short_4h": {
+        "horizon_minutes": 240,
+        "min_return_bps": 40.0,
+        "fee_bps": 5.0
+      },
+      "long_2d": {
+        "horizon_minutes": 2880,
+        "min_return_bps": 150.0,
+        "fee_bps": 5.0
+      },
+      "long_30d": {
+        "horizon_minutes": 43200,
+        "min_return_bps": 500.0,
+        "fee_bps": 5.0
+      },
+      "long_60d": {
+        "horizon_minutes": 86400,
+        "min_return_bps": 800.0,
+        "fee_bps": 5.0
+      }
+    },
+    "horizon_meta": {
+      "short_30m": {
+        "selected_candidate": "xgb_gpu_depth3_regularized",
+        "selected_threshold": 0.6116455271840096,
+        "splits": {
+          "val_start": "2024-12-14T18:12:00",
+          "test_start": "2025-07-22T02:41:00",
+          "purge_minutes": 30
+        },
+        "row_counts": {
+          "usable": 10702078,
+          "train": 900000,
+          "validation": 160000,
+          "test": 160000
+        },
+        "positive_rate": 0.3385781714541793,
+        "selected_test_metrics": {
+          "threshold": 0.6116455271840096,
+          "positive_rate": 0.36815625,
+          "roc_auc": 0.6090047740924174,
+          "average_precision": 0.4546931604513203,
+          "log_loss": 0.6760020426863802,
+          "brier": 0.24155963490588248,
+          "mcc": 0.11760518379825975,
+          "trade_count": 30138,
+          "trade_coverage": 0.1883625,
+          "trade_mean_net_return": 0.0003767075654050949,
+          "trade_hit_rate": 0.5331475214015529
+        }
+      },
+      "short_4h": {
+        "selected_candidate": "xgb_gpu_depth2_low_latency",
+        "selected_threshold": 0.5804457068443298,
+        "splits": {
+          "val_start": "2024-12-14T15:48:00",
+          "test_start": "2025-07-21T23:46:00",
+          "purge_minutes": 240
+        },
+        "row_counts": {
+          "usable": 10700818,
+          "train": 900000,
+          "validation": 160000,
+          "test": 160000
+        },
+        "positive_rate": 0.31029917525931194,
+        "selected_test_metrics": {
+          "threshold": 0.5804457068443298,
+          "positive_rate": 0.3508125,
+          "roc_auc": 0.554856453949421,
+          "average_precision": 0.39032046496035033,
+          "log_loss": 0.7121242817998367,
+          "brier": 0.2592940027991707,
+          "mcc": 0.059103363192689884,
+          "trade_count": 39255,
+          "trade_coverage": 0.24534375,
+          "trade_mean_net_return": -0.0005460581818615885,
+          "trade_hit_rate": 0.4737230925996688
+        }
+      },
+      "long_2d": {
+        "selected_candidate": "xgb_gpu_depth3_regularized",
+        "selected_threshold": 0.5091347098350525,
+        "splits": {
+          "val_start": "2024-12-13T09:31:00",
+          "test_start": "2025-07-20T11:00:00",
+          "purge_minutes": 2880
+        },
+        "row_counts": {
+          "usable": 10684978,
+          "train": 900000,
+          "validation": 160000,
+          "test": 160000
+        },
+        "positive_rate": 0.3147312048747316,
+        "selected_test_metrics": {
+          "threshold": 0.5091347098350525,
+          "positive_rate": 0.3011375,
+          "roc_auc": 0.6579955853548283,
+          "average_precision": 0.4358451106263958,
+          "log_loss": 0.7048305949045037,
+          "brier": 0.25583761507990255,
+          "mcc": 0.18017526740811476,
+          "trade_count": 145369,
+          "trade_coverage": 0.90855625,
+          "trade_mean_net_return": 0.01236943795673784,
+          "trade_hit_rate": 0.4209632039843433
+        }
+      },
+      "long_30d": {
+        "selected_candidate": "xgb_gpu_depth3_regularized",
+        "selected_threshold": 0.553981602191925,
+        "splits": {
+          "val_start": "2024-11-24T03:12:00",
+          "test_start": "2025-06-26T19:40:00",
+          "purge_minutes": 43200
+        },
+        "row_counts": {
+          "usable": 10443058,
+          "train": 900000,
+          "validation": 160000,
+          "test": 160000
+        },
+        "positive_rate": 0.378842385056178,
+        "selected_test_metrics": {
+          "threshold": 0.553981602191925,
+          "positive_rate": 0.0935875,
+          "roc_auc": 0.420002027482419,
+          "average_precision": 0.08229118528353137,
+          "log_loss": 0.7555993640271484,
+          "brier": 0.2811009947836996,
+          "mcc": -0.09351201147052327,
+          "trade_count": 101298,
+          "trade_coverage": 0.6331125,
+          "trade_mean_net_return": -0.21009686968815805,
+          "trade_hit_rate": 0.07285435053011906
+        }
+      },
+      "long_60d": {
+        "selected_candidate": "xgb_gpu_depth3_regularized",
+        "selected_threshold": 0.48057517409324646,
+        "splits": {
+          "val_start": "2024-11-03T11:53:00",
+          "test_start": "2025-06-01T18:12:00",
+          "purge_minutes": 86400
+        },
+        "row_counts": {
+          "usable": 10183858,
+          "train": 900000,
+          "validation": 160000,
+          "test": 160000
+        },
+        "positive_rate": 0.3878215898139978,
+        "selected_test_metrics": {
+          "threshold": 0.48057517409324646,
+          "positive_rate": 0.0,
+          "roc_auc": 0.0,
+          "average_precision": 0.0,
+          "log_loss": 0.0,
+          "brier": 0.0,
+          "mcc": 0.0,
+          "trade_count": 51944,
+          "trade_coverage": 0.32465,
+          "trade_mean_net_return": -0.24440419339502947,
+          "trade_hit_rate": 0.0
+        }
+      }
+    },
+    "feature_columns": [
+      "ret_1m",
+      "ret_3m",
+      "ret_5m",
+      "ret_15m",
+      "ret_30m",
+      "ret_60m",
+      "ret_120m",
+      "ret_240m",
+      "ret_720m",
+      "ret_1440m",
+      "ret_2880m",
+      "range_pct",
+      "body_pct",
+      "upper_wick_pct",
+      "lower_wick_pct",
+      "volatility_5m",
+      "volatility_15m",
+      "volatility_30m_rt",
+      "volatility_60m",
+      "volatility_240m",
+      "volatility_1440m",
+      "realized_vol_30m",
+      "realized_vol_120m",
+      "realized_vol_240m",
+      "realized_vol_1440m",
+      "ema_12_ratio",
+      "ema_26_ratio",
+      "ema_60_ratio",
+      "ema_120_ratio",
+      "ema_240_ratio",
+      "ema_1440_ratio",
+      "macd_ratio",
+      "macd_signal_ratio",
+      "macd_hist_ratio",
+      "rsi_14",
+      "bb_z_20",
+      "dist_high_60",
+      "dist_low_60",
+      "breakout_20",
+      "volume_rel_30",
+      "volume_rel_120",
+      "volume_rel_1440",
+      "value_rel_30",
+      "value_rel_120",
+      "value_rel_1440",
+      "value_z_120",
+      "value_z_1440",
+      "binance_ret_1m",
+      "binance_ret_5m",
+      "binance_ret_15m",
+      "binance_ret_30m",
+      "binance_ret_60m",
+      "binance_ret_120m",
+      "binance_ret_240m",
+      "binance_range_pct",
+      "binance_volume_rel_30",
+      "binance_volume_rel_240",
+      "binance_taker_buy_ratio",
+      "upbit_binance_ret_spread_5m",
+      "upbit_binance_ret_spread_15m",
+      "upbit_binance_ret_spread_60m",
+      "upbit_binance_ret_spread_240m",
+      "kimp_real",
+      "kimp_velocity_5m",
+      "kimp_velocity_15m",
+      "kimp_velocity_60m",
+      "kimp_velocity_240m",
+      "kimp_z_1440",
+      "market_fx",
+      "market_fx_change_60m",
+      "market_fx_change_1440m",
+      "btc_dominance",
+      "btc_dominance_change_60m",
+      "btc_dominance_change_1440m",
+      "btc_dominance_z_1440",
+      "btc_ret_15m",
+      "btc_ret_60m",
+      "btc_volatility_30m",
+      "eth_ret_15m",
+      "eth_ret_60m",
+      "eth_volatility_30m",
+      "rsi_overbought",
+      "rsi_oversold",
+      "fomo_chase_score",
+      "capitulation_score",
+      "round_figure_distance",
+      "near_round_figure",
+      "liquidity_pool_pressure_up",
+      "liquidity_pool_pressure_down",
+      "stop_hunt_up",
+      "stop_hunt_down",
+      "us_session",
+      "asia_session",
+      "session_overlap",
+      "weekend_activity",
+      "btc_lead_lag_60m",
+      "alt_rotation_pressure",
+      "funding_rate",
+      "open_interest_change_60m",
+      "leverage_overheat",
+      "hour_sin",
+      "hour_cos",
+      "dow_sin",
+      "dow_cos"
+    ],
+    "api_integration_ready": true,
+    "behavioral_pattern_features": {
+      "fomo_chase": [
+        "rsi_overbought",
+        "fomo_chase_score",
+        "breakout_20",
+        "volume_rel_30"
+      ],
+      "panic_capitulation": [
+        "rsi_oversold",
+        "capitulation_score",
+        "lower_wick_pct",
+        "value_z_120"
+      ],
+      "liquidity_pool": [
+        "round_figure_distance",
+        "near_round_figure",
+        "liquidity_pool_pressure_up",
+        "liquidity_pool_pressure_down",
+        "stop_hunt_up",
+        "stop_hunt_down"
+      ],
+      "human_activity_cycle": [
+        "asia_session",
+        "us_session",
+        "session_overlap",
+        "weekend_activity"
+      ],
+      "capital_rotation": [
+        "btc_lead_lag_60m",
+        "alt_rotation_pressure",
+        "btc_ret_60m"
+      ],
+      "leverage_overheat_optional": [
+        "funding_rate",
+        "open_interest_change_60m",
+        "leverage_overheat"
+      ]
+    },
+    "external_realtime_fields": {
+      "kimp_real": "Computed from close_u / (close_b * market_fx) - 1 when not supplied.",
+      "market_fx": "USD/KRW rate. Already present in the cached training data; pass current value in live API mode.",
+      "btc_dominance": "Optional live field. Historical training data is not present, so retrain after adding historical dominance for model-learned impact.",
+      "funding_rate": "Optional derivatives field for overheat cross-check. Historical training data is absent in the current parquet, so this feature is neutral unless supplied and retrained with history.",
+      "open_interest": "Optional derivatives field. Historical training data is absent in the current parquet, so open_interest_change_60m is neutral unless supplied and retrained with history."
+    }
+  },
+  "experiments": {
+    "short_30m": [
+      {
+        "candidate": "xgb_gpu_depth2_low_latency",
+        "fit_seconds": 68.96623149991501,
+        "latency_ms_per_20_assets": 2.7459600009024143,
+        "best_iteration": 509,
+        "validation": {
+          "threshold": 0.6136633181571962,
+          "positive_rate": 0.3731625,
+          "roc_auc": 0.6325192892130713,
+          "average_precision": 0.4900359693792535,
+          "log_loss": 0.6537811044142657,
+          "brier": 0.23133796843933468,
+          "mcc": 0.13618394808216336,
+          "trade_count": 17600,
+          "trade_coverage": 0.11,
+          "trade_mean_net_return": 0.0011499958188437153,
+          "trade_hit_rate": 0.6040340909090909
+        },
+        "test": {
+          "threshold": 0.6136633181571962,
+          "positive_rate": 0.36815625,
+          "roc_auc": 0.6102894746377434,
+          "average_precision": 0.45512464136955394,
+          "log_loss": 0.6872438691090871,
+          "brier": 0.24694632091534027,
+          "mcc": 0.1082741846837991,
+          "trade_count": 26278,
+          "trade_coverage": 0.1642375,
+          "trade_mean_net_return": 0.0003262186075643729,
+          "trade_hit_rate": 0.5298728974807824
+        }
+      },
+      {
+        "candidate": "xgb_gpu_depth3_regularized",
+        "fit_seconds": 8.651843599975109,
+        "latency_ms_per_20_assets": 2.79575000051409,
+        "best_iteration": 643,
+        "validation": {
+          "threshold": 0.6116455271840096,
+          "positive_rate": 0.3731625,
+          "roc_auc": 0.6373413554295415,
+          "average_precision": 0.49660120659882584,
+          "log_loss": 0.6491557234628567,
+          "brier": 0.2292470526166653,
+          "mcc": 0.14796572843325,
+          "trade_count": 20000,
+          "trade_coverage": 0.125,
+          "trade_mean_net_return": 0.001231064291203936,
+          "trade_hit_rate": 0.6079
+        },
+        "test": {
+          "threshold": 0.6116455271840096,
+          "positive_rate": 0.36815625,
+          "roc_auc": 0.6090047740924174,
+          "average_precision": 0.4546931604513203,
+          "log_loss": 0.6760020426863802,
+          "brier": 0.24155963490588248,
+          "mcc": 0.11760518379825975,
+          "trade_count": 30138,
+          "trade_coverage": 0.1883625,
+          "trade_mean_net_return": 0.0003767075654050949,
+          "trade_hit_rate": 0.5331475214015529
+        }
+      }
+    ],
+    "short_4h": [
+      {
+        "candidate": "xgb_gpu_depth2_low_latency",
+        "fit_seconds": 3.611890999949537,
+        "latency_ms_per_20_assets": 2.6680000009946525,
+        "best_iteration": 87,
+        "validation": {
+          "threshold": 0.5804457068443298,
+          "positive_rate": 0.37116875,
+          "roc_auc": 0.612706378075566,
+          "average_precision": 0.458686708238415,
+          "log_loss": 0.6635236887955372,
+          "brier": 0.23583260409688805,
+          "mcc": 0.11473255275451325,
+          "trade_count": 27202,
+          "trade_coverage": 0.1700125,
+          "trade_mean_net_return": 0.004629331902752487,
+          "trade_hit_rate": 0.5876038526578928
+        },
+        "test": {
+          "threshold": 0.5804457068443298,
+          "positive_rate": 0.3508125,
+          "roc_auc": 0.554856453949421,
+          "average_precision": 0.39032046496035033,
+          "log_loss": 0.7121242817998367,
+          "brier": 0.2592940027991707,
+          "mcc": 0.059103363192689884,
+          "trade_count": 39255,
+          "trade_coverage": 0.24534375,
+          "trade_mean_net_return": -0.0005460581818615885,
+          "trade_hit_rate": 0.4737230925996688
+        }
+      },
+      {
+        "candidate": "xgb_gpu_depth3_regularized",
+        "fit_seconds": 3.309707200038247,
+        "latency_ms_per_20_assets": 3.1719819991849363,
+        "best_iteration": 82,
+        "validation": {
+          "threshold": 0.5348509550094604,
+          "positive_rate": 0.37116875,
+          "roc_auc": 0.6147277785454249,
+          "average_precision": 0.46091186395323785,
+          "log_loss": 0.6610962372978934,
+          "brier": 0.23479248922996832,
+          "mcc": 0.1359644367603111,
+          "trade_count": 53602,
+          "trade_coverage": 0.3350125,
+          "trade_mean_net_return": 0.003591374039593517,
+          "trade_hit_rate": 0.560538785866199
+        },
+        "test": {
+          "threshold": 0.5348509550094604,
+          "positive_rate": 0.3508125,
+          "roc_auc": 0.5465737724513493,
+          "average_precision": 0.38609928293394974,
+          "log_loss": 0.7029805261376968,
+          "brier": 0.25473378657705104,
+          "mcc": 0.057435812471492,
+          "trade_count": 57383,
+          "trade_coverage": 0.35864375,
+          "trade_mean_net_return": -0.0005611111592344384,
+          "trade_hit_rate": 0.46369133715560357
+        }
+      }
+    ],
+    "long_2d": [
+      {
+        "candidate": "xgb_gpu_depth2_low_latency",
+        "fit_seconds": 2.661844199988991,
+        "latency_ms_per_20_assets": 2.7538620005361736,
+        "best_iteration": 0,
+        "validation": {
+          "threshold": 0.5176495909690857,
+          "positive_rate": 0.5403125,
+          "roc_auc": 0.5257496042831546,
+          "average_precision": 0.5596066732134142,
+          "log_loss": 0.6900476763150031,
+          "brier": 0.24845166634108,
+          "mcc": 0.0,
+          "trade_count": 160000,
+          "trade_coverage": 1.0,
+          "trade_mean_net_return": 0.027436409057512434,
+          "trade_hit_rate": 0.69250625
+        },
+        "test": {
+          "threshold": 0.5176495909690857,
+          "positive_rate": 0.3011375,
+          "roc_auc": 0.6492402024839905,
+          "average_precision": 0.417162879872668,
+          "log_loss": 0.7101004433243969,
+          "brier": 0.2584715757935146,
+          "mcc": 0.0,
+          "trade_count": 160000,
+          "trade_coverage": 1.0,
+          "trade_mean_net_return": 0.009631352566731899,
+          "trade_hit_rate": 0.4006375
+        }
+      },
+      {
+        "candidate": "xgb_gpu_depth3_regularized",
+        "fit_seconds": 2.497175100026652,
+        "latency_ms_per_20_assets": 2.8825340000912547,
+        "best_iteration": 4,
+        "validation": {
+          "threshold": 0.5091347098350525,
+          "positive_rate": 0.5403125,
+          "roc_auc": 0.5264557902364551,
+          "average_precision": 0.5716180768050045,
+          "log_loss": 0.6897863598613955,
+          "brier": 0.24832341560545734,
+          "mcc": 0.016461541728081137,
+          "trade_count": 95068,
+          "trade_coverage": 0.594175,
+          "trade_mean_net_return": 0.02894238784004765,
+          "trade_hit_rate": 0.6788088526107628
+        },
+        "test": {
+          "threshold": 0.5091347098350525,
+          "positive_rate": 0.3011375,
+          "roc_auc": 0.6579955853548283,
+          "average_precision": 0.4358451106263958,
+          "log_loss": 0.7048305949045037,
+          "brier": 0.25583761507990255,
+          "mcc": 0.18017526740811476,
+          "trade_count": 145369,
+          "trade_coverage": 0.90855625,
+          "trade_mean_net_return": 0.01236943795673784,
+          "trade_hit_rate": 0.4209632039843433
+        }
+      }
+    ],
+    "long_30d": [
+      {
+        "candidate": "xgb_gpu_depth2_low_latency",
+        "fit_seconds": 2.7622456999961287,
+        "latency_ms_per_20_assets": 2.973264001775533,
+        "best_iteration": 24,
+        "validation": {
+          "threshold": 0.6740745306015015,
+          "positive_rate": 0.08243125,
+          "roc_auc": 0.6113821485543904,
+          "average_precision": 0.16030491851141646,
+          "log_loss": 0.7369355832012344,
+          "brier": 0.2715100857075357,
+          "mcc": 0.1925885118709384,
+          "trade_count": 3441,
+          "trade_coverage": 0.02150625,
+          "trade_mean_net_return": 0.0013245583143022988,
+          "trade_hit_rate": 0.5356001162452776
+        },
+        "test": {
+          "threshold": 0.6740745306015015,
+          "positive_rate": 0.0935875,
+          "roc_auc": 0.2805318203182465,
+          "average_precision": 0.06805591495251492,
+          "log_loss": 0.8311878367371189,
+          "brier": 0.31612855467542383,
+          "mcc": -0.13824067367345744,
+          "trade_count": 24989,
+          "trade_coverage": 0.15618125,
+          "trade_mean_net_return": -0.3300192745232072,
+          "trade_hit_rate": 0.0
+        }
+      },
+      {
+        "candidate": "xgb_gpu_depth3_regularized",
+        "fit_seconds": 2.3181153999175876,
+        "latency_ms_per_20_assets": 3.0506980000063777,
+        "best_iteration": 1,
+        "validation": {
+          "threshold": 0.553981602191925,
+          "positive_rate": 0.08243125,
+          "roc_auc": 0.6002020826134613,
+          "average_precision": 0.10384571693039296,
+          "log_loss": 0.7396423117292698,
+          "brier": 0.27315809553008885,
+          "mcc": 0.09529561570123884,
+          "trade_count": 76050,
+          "trade_coverage": 0.4753125,
+          "trade_mean_net_return": -0.07337672290773499,
+          "trade_hit_rate": 0.1998948060486522
+        },
+        "test": {
+          "threshold": 0.553981602191925,
+          "positive_rate": 0.0935875,
+          "roc_auc": 0.420002027482419,
+          "average_precision": 0.08229118528353137,
+          "log_loss": 0.7555993640271484,
+          "brier": 0.2811009947836996,
+          "mcc": -0.09351201147052327,
+          "trade_count": 101298,
+          "trade_coverage": 0.6331125,
+          "trade_mean_net_return": -0.21009686968815805,
+          "trade_hit_rate": 0.07285435053011906
+        }
+      }
+    ],
+    "long_60d": [
+      {
+        "candidate": "xgb_gpu_depth2_low_latency",
+        "fit_seconds": 3.455096199992113,
+        "latency_ms_per_20_assets": 3.0684660002589226,
+        "best_iteration": 103,
+        "validation": {
+          "threshold": 0.3671828508377075,
+          "positive_rate": 0.67059375,
+          "roc_auc": 0.6162940421584557,
+          "average_precision": 0.7684705125946688,
+          "log_loss": 0.8990106169059154,
+          "brier": 0.32433614865149546,
+          "mcc": 0.28933788830541096,
+          "trade_count": 75247,
+          "trade_coverage": 0.47029375,
+          "trade_mean_net_return": 0.17853750383127423,
+          "trade_hit_rate": 0.8412029715470384
+        },
+        "test": {
+          "threshold": 0.3671828508377075,
+          "positive_rate": 0.0,
+          "roc_auc": 0.0,
+          "average_precision": 0.0,
+          "log_loss": 0.0,
+          "brier": 0.0,
+          "mcc": 0.0,
+          "trade_count": 56524,
+          "trade_coverage": 0.353275,
+          "trade_mean_net_return": -0.24743524344329995,
+          "trade_hit_rate": 0.0
+        }
+      },
+      {
+        "candidate": "xgb_gpu_depth3_regularized",
+        "fit_seconds": 2.3884982999879867,
+        "latency_ms_per_20_assets": 2.906337999738753,
+        "best_iteration": 0,
+        "validation": {
+          "threshold": 0.48057517409324646,
+          "positive_rate": 0.67059375,
+          "roc_auc": 0.7804901402908291,
+          "average_precision": 0.8485791187737058,
+          "log_loss": 0.7040055572151513,
+          "brier": 0.2554277847369618,
+          "mcc": 0.3903557512651967,
+          "trade_count": 74991,
+          "trade_coverage": 0.46869375,
+          "trade_mean_net_return": 0.19472029392004025,
+          "trade_hit_rate": 0.9099491939032683
+        },
+        "test": {
+          "threshold": 0.48057517409324646,
+          "positive_rate": 0.0,
+          "roc_auc": 0.0,
+          "average_precision": 0.0,
+          "log_loss": 0.0,
+          "brier": 0.0,
+          "mcc": 0.0,
+          "trade_count": 51944,
+          "trade_coverage": 0.32465,
+          "trade_mean_net_return": -0.24440419339502947,
+          "trade_hit_rate": 0.0
+        }
+      }
+    ]
+  },
+  "elapsed_seconds": 1323.6011366000166
+}

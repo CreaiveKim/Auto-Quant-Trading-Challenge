@@ -127,7 +127,7 @@ class RealtimeFeatureConfig:
 
 
 class RealtimeCryptoModel:
-    """Small pickle-friendly inference wrapper for the Upbit realtime model."""
+    """업비트 실시간 모델을 위한 가벼운 피클 호환 추론 래퍼."""
 
     def __init__(
         self,

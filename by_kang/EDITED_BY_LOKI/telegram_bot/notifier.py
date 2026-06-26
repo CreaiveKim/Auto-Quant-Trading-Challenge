@@ -23,20 +23,20 @@ class AlertType(Enum):
 
 
 class TelegramNotifier:
-    """Telegram API를 사용한 알림 발송"""
+    """텔레그램 API를 사용한 알림 발송."""
 
     def __init__(self, token: str, chat_id: str, enabled: bool = True):
         """
-        Args:
+        인자:
             token: 텔레그램 봇 토큰
-            chat_id: 수신 chat ID (숫자 또는 @username)
+            chat_id: 수신 채팅 ID (숫자 또는 @사용자이름)
             enabled: 봇 활성화 여부
         """
         self.token = token
         self.chat_id = chat_id
         self.channel = None
         self.enabled = enabled and bool(token)
-        # allow channel username to be used as default chat target (e.g. @my_channel)
+        # 채널 사용자 이름이 들어오면 기본 전송 대상으로 사용할 수 있게 함.
         if isinstance(chat_id, str) and chat_id.startswith("@"):
             self.channel = chat_id
         self.api_url = f"https://api.telegram.org/bot{token}"
@@ -83,9 +83,9 @@ class TelegramNotifier:
         """
         거래 신호 알림
         
-        Args:
-            market: 거래쌍 (e.g., "KRW-BTC")
-            signal_type: 신호 유형 (BUY/SELL/HOLD)
+        인자:
+            market: 거래쌍 예시: "KRW-BTC"
+            signal_type: 신호 유형 (BUY, SELL, HOLD)
             probability: 신뢰도 (0~1)
             price: 현재 가격
             features: 추가 기술 지표
@@ -123,7 +123,7 @@ class TelegramNotifier:
         """
         위험 상태 알림
         
-        Args:
+        인자:
             alert_type: CRITICAL_LOSS, OVERHEATING 등
             portfolio_value: 포트폴리오 가치
             loss_pct: 손실률

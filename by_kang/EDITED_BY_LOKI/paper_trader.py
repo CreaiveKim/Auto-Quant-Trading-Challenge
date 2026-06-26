@@ -1,4 +1,4 @@
-"""Mock Upbit auto-trading engine for paper trading."""
+"""모의투자를 위한 업비트 자동매매 엔진."""
 
 import ccxt
 import logging

@@ -1,12 +1,11 @@
 """
-AI-Driven Crypto Trading System with Telegram Bot Integration
-AWS FREE TIER Optimized - By LOKI
+텔레그램 알림을 포함한 AI 기반 암호화폐 매매 시스템.
 
-Features:
-- Real-time trading signals (XGBoost model)
-- Telegram bot for alerts & monitoring
-- Risk-based portfolio allocation
-- Position management
+주요 기능:
+- XGBoost 모델 기반 실시간 거래 신호
+- 텔레그램 알림과 모니터링
+- 위험 성향 기반 포트폴리오 배분
+- 포지션 관리
 """
 
 import os
@@ -21,25 +20,25 @@ import numpy as np
 from flask import Flask, jsonify, request
 import ccxt
 
-# Local imports
+# 로컬 모듈 불러오기
 from config import config
 from paper_trader import PaperTradingEngine
 from telegram_bot.notifier import TelegramNotifier, AlertType
 from risk_manager.portfolio import PortfolioRiskManager, RiskProfile
 from quant_app.realtime_model import build_realtime_features
 
-# Setup logging
+# 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
+# 플라스크 앱 초기화
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 
-# Global state
+# 전역 상태
 model = None
 exchange = None
 notifier = None
@@ -48,10 +47,10 @@ paper_trader = None
 
 
 def initialize_app():
-    """Initialize the application."""
+    """애플리케이션 초기화."""
     global model, exchange, notifier, portfolio_manager, paper_trader
 
-    # 1. ??? ???
+    # 1. 모델 로드
     try:
         model_path = config.MODEL_FILE
         if not os.path.exists(model_path):
@@ -62,8 +61,8 @@ def initialize_app():
                 with open(model_path, "rb") as f:
                     model = pickle.load(f)
             except ModuleNotFoundError as mnfe:
-                # ???????? ?????(?? ai-server2.quant_app)??????????????.
-                # ????????? ?????ai-server2 ?????sys.path???????? ?????????.
+                # 피클에 저장된 모듈 경로가 현재 경로와 다를 수 있음.
+                # ai-server2 사본이 있으면 sys.path에 추가해 호환 로드를 시도함.
                 import sys
                 candidate = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ai-server2"))
                 if os.path.isdir(candidate) and candidate not in sys.path:
@@ -72,7 +71,7 @@ def initialize_app():
                 with open(model_path, "rb") as f:
                     model = pickle.load(f)
             
-            # XGBoost ??? ???
+            # XGBoost 구버전 속성 호환 보정
             if hasattr(model, 'available_horizons'):
                 for h in model.available_horizons():
                     if hasattr(model, 'models') and h in model.models:
@@ -90,7 +89,7 @@ def initialize_app():
         logger.error(f"Failed to load model: {e}")
         model = None
 
-    # 2. ??????????
+    # 2. 거래소 연결 초기화
     try:
         exchange = ccxt.upbit()
         logger.info("Exchange (Upbit) initialized")
@@ -98,7 +97,7 @@ def initialize_app():
         logger.error(f"Failed to initialize exchange: {e}")
         exchange = None
 
-    # 3. Telegram ???????
+    # 3. 텔레그램 알림 초기화
     if config.telegram.ENABLED:
         try:
             notifier = TelegramNotifier(
@@ -118,9 +117,9 @@ def initialize_app():
         logger.info("Telegram bot disabled (no token provided)")
         notifier = None
 
-    # 4. ????????/ ?????? ??? ?????
+    # 4. 포트폴리오와 모의투자 엔진 초기화
     try:
-        risk_profile = RiskProfile.NEUTRAL  # ?????
+        risk_profile = RiskProfile.NEUTRAL  # 기본 위험 성향
         if config.trade.PAPER_TRADING_ENABLED:
             paper_trader = PaperTradingEngine(
                 trade_config=config.trade,
@@ -145,8 +144,8 @@ def initialize_app():
 
 @app.before_request
 def before_request():
-    """Run request prechecks."""
-    # Status and paper-trading control endpoints are allowed during degraded startup.
+    """요청 전 시스템 상태 점검."""
+    # 상태 확인과 모의투자 제어 엔드포인트는 초기화가 덜 된 상태에서도 허용함.
     if request.endpoint in [
         "health_check",
         "paper_status",
@@ -160,7 +159,7 @@ def before_request():
 
 
 def build_ohlcv_frame(market: str, ohlcv: List[List[float]]) -> pd.DataFrame:
-    """Convert ccxt OHLCV rows into the realtime feature input schema."""
+    """ccxt OHLCV 행을 실시간 피처 입력 스키마로 변환."""
 
     rows = []
     for candle in ohlcv:
@@ -182,7 +181,7 @@ def predict_market_signal(
     ohlcv: List[List[float]],
     horizon: str = "short_30m",
 ) -> Dict[str, Any]:
-    """Run the deployed realtime model for a single Upbit market."""
+    """배포된 실시간 모델로 단일 업비트 마켓 신호 계산."""
 
     if not ohlcv:
         raise ValueError("No OHLCV data")
@@ -230,7 +229,7 @@ def predict_market_signal(
 
 
 def build_signal_response() -> Dict[str, Any]:
-    """Build the /signal payload from live Upbit data and model inference."""
+    """/signal 응답에 사용할 실시간 신호와 포트폴리오 정보 생성."""
 
     results = []
     market_prices = {}
@@ -315,7 +314,7 @@ def build_signal_response() -> Dict[str, Any]:
 
 @app.route("/health", methods=["GET"])
 def health_check():
-    """Return health status."""
+    """서비스 상태 반환."""
     return jsonify({
         "status": "healthy" if model and exchange else "degraded",
         "timestamp": datetime.now().isoformat(),
@@ -328,7 +327,7 @@ def health_check():
 
 @app.route("/paper/start", methods=["POST"])
 def start_paper_trading():
-    """Start paper trading."""
+    """모의투자 루프 시작."""
     if not paper_trader or not exchange:
         return jsonify({"error": "Paper trading engine or exchange not initialized"}), 500
 
@@ -341,7 +340,7 @@ def start_paper_trading():
 
 @app.route("/paper/stop", methods=["POST"])
 def stop_paper_trading():
-    """Stop paper trading."""
+    """모의투자 루프 중지."""
     if not paper_trader:
         return jsonify({"error": "Paper trading engine not initialized"}), 500
 
@@ -354,7 +353,7 @@ def stop_paper_trading():
 
 @app.route("/paper/status", methods=["GET"])
 def paper_status():
-    """Return paper trading status."""
+    """모의투자 상태 반환."""
     if not paper_trader or not exchange:
         return jsonify({"error": "Paper trading engine not initialized"}), 500
 
@@ -373,9 +372,9 @@ def paper_status():
 
 @app.route("/signal", methods=["GET"])
 def signal():
-    """???????? ??? ??? ????? ???
+    """실시간 거래 신호와 포트폴리오 요약 반환.
     
-    Returns:
+    반환:
         {
             "timestamp": "2026-06-16T10:30:00",
             "results": [
@@ -399,9 +398,9 @@ def signal():
 
 @app.route("/allocation", methods=["POST"])
 def get_allocation():
-    """??? ??? ???
+    """현재 후보 신호 기준으로 투자금 배분 계산.
     
-    Request:
+    요청:
         {
             "capital": 1000000,
             "risk_profile": "neutral"
@@ -412,7 +411,7 @@ def get_allocation():
         capital = data.get("capital", 1_000_000)
         risk_profile_str = data.get("risk_profile", "neutral")
 
-        # ??? ??? ??? ???
+        # 현재 마켓별 실시간 신호 수집
         ohlcv_data = []
         for market in config.trade.MARKETS:
             try:
@@ -431,7 +430,7 @@ def get_allocation():
         if candidates_df.empty:
             return jsonify({"error": "No market data available"}), 400
 
-        # ??? ??? ???
+        # 위험 성향별 배분 계산
         allocation = portfolio_manager.calculate_allocation(candidates_df, capital)
 
         total_allocated = sum(allocation.values())
@@ -452,11 +451,11 @@ def get_allocation():
 
 @app.route("/portfolio", methods=["GET"])
 def get_portfolio():
-    """Return portfolio status."""
+    """포트폴리오 상태 반환."""
     if not portfolio_manager:
         return jsonify({"error": "Portfolio manager not initialized"}), 500
 
-    # ??? ???????
+    # 현재 가격 조회
     market_prices = {}
     for market in config.trade.MARKETS:
         try:
@@ -498,12 +497,12 @@ def get_portfolio():
 
 @app.route("/test-telegram", methods=["POST"])
 def test_telegram():
-    """Send a Telegram test message."""
+    """텔레그램 테스트 메시지 발송."""
     if not notifier:
         return jsonify({"error": "Telegram bot not initialized"}), 400
 
     try:
-        result = notifier.send_message("?? Telegram bot ?????????? - ???????? ??? ??????.")
+        result = notifier.send_message("Telegram bot 연결 테스트 - 알림 기능이 정상 동작함.")
         return jsonify({
             "success": result,
             "message": "Test message sent" if result else "Failed to send test message",
@@ -514,7 +513,7 @@ def test_telegram():
 
 @app.route("/metrics", methods=["GET"])
 def get_metrics():
-    """Return service metrics."""
+    """서비스 메트릭 반환."""
     if not portfolio_manager:
         return jsonify({"error": "Portfolio manager not initialized"}), 500
 
@@ -550,10 +549,10 @@ def internal_error(error):
 
 
 if __name__ == "__main__":
-    # ?????
+    # 애플리케이션 초기화
     initialize_app()
 
-    # ?????
+    # 플라스크 서버 실행
     app.run(
         host=config.HOST,
         port=config.PORT,

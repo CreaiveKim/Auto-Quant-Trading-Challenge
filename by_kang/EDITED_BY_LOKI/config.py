@@ -1,4 +1,4 @@
-"""Configuration management for the realtime quant trading app."""
+"""실시간 퀀트 매매 앱 설정 관리."""
 
 import os
 from dataclasses import dataclass
@@ -24,7 +24,7 @@ def _env_markets() -> list[str]:
 
 @dataclass
 class TelegramConfig:
-    """Telegram notification settings."""
+    """텔레그램 알림 설정."""
 
     TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -34,7 +34,7 @@ class TelegramConfig:
 
 @dataclass
 class TradeConfig:
-    """Trading and paper-trading settings."""
+    """매매 및 모의투자 설정."""
 
     BASE_THRESHOLD: float = float(os.getenv("BASE_THRESHOLD", 0.60))
     TAKE_PROFIT: float = float(os.getenv("TAKE_PROFIT", 0.02))
@@ -54,7 +54,7 @@ class TradeConfig:
 
 @dataclass
 class RiskConfig:
-    """Risk management defaults."""
+    """리스크 관리 기본값."""
 
     POSITION_SIZES = {
         "conservative": {"high_confidence": 0.3, "medium": 0.2, "low": 0.0},
@@ -81,7 +81,7 @@ class RiskConfig:
 
 @dataclass
 class CloudConfig:
-    """Cloud deployment hints. The app itself does not call cloud provider APIs."""
+    """클라우드 배포 참고 설정. 앱에서 클라우드 API를 직접 호출하지는 않음."""
 
     PROVIDER: str = os.getenv("CLOUD_PROVIDER", "oracle")
     ORACLE_HOME_REGION: str = os.getenv("ORACLE_HOME_REGION", "ap-seoul-1")
@@ -92,7 +92,7 @@ class CloudConfig:
 
 @dataclass
 class AppConfig:
-    """Application settings."""
+    """애플리케이션 설정."""
 
     DEBUG: bool = _env_bool("DEBUG", False)
     HOST: str = os.getenv("HOST", "0.0.0.0")
@@ -109,7 +109,7 @@ class AppConfig:
         self.trade = TradeConfig()
         self.risk = RiskConfig()
         self.cloud = CloudConfig()
-        self.aws = self.cloud  # Backward-compatible alias for older helper code.
+        self.aws = self.cloud  # 기존 헬퍼 코드와의 호환을 위한 별칭임.
 
     @classmethod
     def from_env(cls) -> "AppConfig":

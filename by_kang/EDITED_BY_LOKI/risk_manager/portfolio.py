@@ -1,5 +1,5 @@
 """
-Risk Manager - split-investment portfolio allocation and risk management.
+리스크 관리자 - 분할 투자 포트폴리오 배분과 리스크 관리.
 """
 
 import logging
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class RiskProfile(Enum):
-    """Investment style."""
+    """투자 성향."""
 
     CONSERVATIVE = "conservative"
     NEUTRAL = "neutral"
@@ -24,7 +24,7 @@ class RiskProfile(Enum):
 
 @dataclass
 class Position:
-    """Open position."""
+    """보유 중인 포지션."""
 
     market: str
     entry_price: float
@@ -35,20 +35,20 @@ class Position:
 
     @property
     def position_value(self) -> float:
-        """Entry-value of the position."""
+        """진입가 기준 포지션 가치."""
 
         return self.entry_price * self.quantity
 
     @property
     def unrealized_return(self) -> float:
-        """Placeholder return value; current price is needed for a real PnL."""
+        """현재가가 없을 때 사용하는 임시 평가값."""
 
         return self.quantity * self.entry_price
 
 
 @dataclass
 class AllocationRule:
-    """Split-investment allocation rule."""
+    """분할 투자 배분 규칙."""
 
     high_confidence_allocation: float
     medium_confidence_allocation: float
@@ -59,7 +59,7 @@ class AllocationRule:
 
 
 class PortfolioRiskManager:
-    """Portfolio risk manager and split-investment allocator."""
+    """포트폴리오 리스크 관리자와 분할 투자 배분기."""
 
     def __init__(
         self,
@@ -79,7 +79,7 @@ class PortfolioRiskManager:
         self.allocation_rules = self._get_allocation_rules()
 
     def _get_allocation_rules(self) -> AllocationRule:
-        """Return allocation rules for the selected risk profile."""
+        """선택한 위험 성향에 맞는 배분 규칙 반환."""
 
         rules_map = {
             RiskProfile.CONSERVATIVE: AllocationRule(
@@ -117,11 +117,10 @@ class PortfolioRiskManager:
         current_position_value: Optional[float] = None,
     ) -> Dict[str, float]:
         """
-        Calculate split allocations from confidence.
+        신뢰도에 따라 분할 투자 금액 계산.
 
-        The allocator does not force all available cash into the market. It only
-        deploys up to the profile's max_total_allocation after accounting for
-        positions that are already open.
+        사용 가능한 현금을 모두 시장에 투입하지 않고, 이미 보유 중인 포지션을
+        반영한 뒤 위험 성향별 최대 투자 비율까지만 배분함.
         """
 
         allocation: Dict[str, float] = {}
@@ -207,7 +206,7 @@ class PortfolioRiskManager:
         confidence: float,
         target_allocation: float,
     ) -> Position:
-        """Add a position."""
+        """포지션 추가."""
 
         position = Position(
             market=market,
@@ -228,7 +227,7 @@ class PortfolioRiskManager:
         exit_price: float,
         reason: str = "Manual",
     ) -> Tuple[float, float]:
-        """Close a position and return PnL and PnL percent."""
+        """포지션을 청산하고 손익과 손익률 반환."""
 
         if market not in self.positions:
             logger.warning(f"Position not found: {market}")
@@ -250,7 +249,7 @@ class PortfolioRiskManager:
         return pnl, pnl_pct
 
     def calculate_portfolio_metrics(self, market_prices: Dict[str, float]) -> Dict:
-        """Calculate portfolio metrics."""
+        """포트폴리오 지표 계산."""
 
         total_value = 0.0
         total_unrealized_pnl = 0.0
@@ -285,7 +284,7 @@ class PortfolioRiskManager:
         }
 
     def _calculate_max_drawdown(self) -> float:
-        """Calculate max drawdown."""
+        """최대 낙폭 계산."""
 
         if not self.equity_curve:
             return 0.0
@@ -295,7 +294,7 @@ class PortfolioRiskManager:
         return float(np.min(dd))
 
     def _calculate_sharpe_ratio(self, risk_free_rate: float = 0.02) -> float:
-        """Calculate Sharpe ratio using a daily risk-free rate assumption."""
+        """일 단위 무위험 수익률 가정으로 샤프 비율 계산."""
 
         if len(self.equity_curve) < 2:
             return 0.0
@@ -306,7 +305,7 @@ class PortfolioRiskManager:
         return float((excess_return / np.std(returns)) * np.sqrt(252)) if np.std(returns) > 0 else 0.0
 
     def get_risk_summary(self, market_prices: Dict[str, float]) -> Dict:
-        """Summarize portfolio risk."""
+        """포트폴리오 리스크 요약."""
 
         metrics = self.calculate_portfolio_metrics(market_prices)
         max_dd = metrics["max_drawdown"]

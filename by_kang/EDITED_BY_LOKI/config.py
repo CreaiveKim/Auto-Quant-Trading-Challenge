@@ -97,7 +97,7 @@ class AppConfig:
     DEBUG: bool = _env_bool("DEBUG", False)
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", 8000))
-    MODEL_FILE: str = os.getenv("MODEL_FILE", "Low_conf.pkl")
+    MODEL_FILE: str = os.getenv("MODEL_FILE", "models/feature_selected_realtime_model.pkl")
 
     telegram: TelegramConfig = None
     trade: TradeConfig = None

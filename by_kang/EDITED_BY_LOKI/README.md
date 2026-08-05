@@ -4,6 +4,20 @@ Upbit 1분봉 데이터를 실시간으로 가져와 XGBoost 기반 모델로 �
 
 이 프로젝트는 **Oracle Cloud Always Free Ampere A1**에서 24시간 추론 서버로 구동하는 것을 우선 목표로 합니다. 학습은 별도 환경에서 수행하는 것을 권장합니다.
 
+## 최적 피처 조합 업데이트
+
+2026-07-03 기준으로 피처 선택 재학습을 수행해 기존 104개 피처를 horizon별 최적 조합으로 축소했습니다. 기본 모델 경로는 `models/feature_selected_realtime_model.pkl`이며, 모델 파일 자체는 GitHub에 올리지 않고 로컬 또는 배포 서버에만 둡니다.
+
+| 예측 구간 | 선택 후보 | 피처 수 | 배포 권장 | 요약 |
+| --- | --- | ---: | --- | --- |
+| `short_30m` | `top_32_importance` | 32 | 예 | 단기 실시간 진입 기본 후보 |
+| `short_4h` | `top_24_importance` | 24 | 예 | 중단기 확인용 후보 |
+| `long_2d` | `top_48_importance` | 48 | 예 | 2일 방향성 참고 후보 |
+| `long_30d` | `top_24_importance` | 24 | 아니오 | test 순수익이 음수라 기본 진입에는 비권장 |
+| `long_60d` | 제외 | 0 | 아니오 | 시간순 검증 구간에서 target class가 한쪽으로 쏠려 학습 제외 |
+
+상세 결과는 `reports/feature_selection_report.ipynb`와 `reports/feature_selection_metrics.json`에서 확인합니다.
+
 ## 현재 동작 기준
 
 - 클라우드 권장 환경: Oracle Cloud Always Free `VM.Standard.A1.Flex`
@@ -11,7 +25,7 @@ Upbit 1분봉 데이터를 실시간으로 가져와 XGBoost 기반 모델로 �
 - 거래소 데이터: `ccxt.upbit()` 공개 API
 - 입력 데이터: 마켓별 Upbit 1분봉 OHLCV 200개
 - 실시간 피처: `quant_app.realtime_model.build_realtime_features`
-- 모델 추론: `Low_conf.pkl`의 `predict_signal(..., horizon="short_30m")`
+- 모델 추론: `models/feature_selected_realtime_model.pkl`의 `predict_signal(..., horizon="short_30m")`
 - 기본 마켓: `KRW-BTC`, `KRW-ETH`, `KRW-XRP`, `KRW-SOL`, `KRW-ADA`
 - 배분 방식: 후보 확률, 현재 포지션 가치, 현금, 성향별 최대 투자 한도를 함께 고려
 - 현금 정책: 분할투자를 하되 전체 현금을 강제로 100% 투입하지 않음
@@ -24,7 +38,7 @@ Upbit 1분봉 데이터를 실시간으로 가져와 XGBoost 기반 모델로 �
 | `paper_trader.py` | 모의투자 자동매매 루프 |
 | `risk_manager/portfolio.py` | 분할 투자 및 포트폴리오 위험 관리 |
 | `quant_app/realtime_model.py` | 실시간 피처 생성 및 모델 wrapper |
-| `Low_conf.pkl` | 배포용 모델 파일 |
+| `models/feature_selected_realtime_model.pkl` | 피처 선택 재학습으로 만든 로컬 배포용 모델 파일 |
 | `Dockerfile` | Oracle Ampere A1/ARM64 호환 Docker 실행 설정 |
 | `docker-compose.yml` | 단일 컨테이너 실행용 Compose 설정 |
 | `.dockerignore` | Oracle 서버 Docker 빌드 최적화용 제외 목록 |
@@ -73,7 +87,7 @@ cp .env.example .env
 | `ORACLE_SHAPE` | `VM.Standard.A1.Flex` | Oracle 권장 Shape |
 | `ORACLE_OCPU` | `2` | 권장 OCPU |
 | `ORACLE_MEMORY_GB` | `12` | 권장 메모리 |
-| `MODEL_FILE` | `Low_conf.pkl` | 모델 파일 경로 |
+| `MODEL_FILE` | `models/feature_selected_realtime_model.pkl` | 모델 파일 경로 |
 | `BASE_THRESHOLD` | `0.60` | 기본 진입 임계값 |
 | `INITIAL_CAPITAL` | `5000000` | 모의투자 초기 자본 |
 | `PAPER_TRADING_ENABLED` | `True` | 앱 초기화 시 모의투자 엔진 생성 여부 |
@@ -248,7 +262,7 @@ python -m compileall app.py paper_trader.py risk_manager/portfolio.py quant_app/
 모델 로딩 확인:
 
 ```bash
-python -c "import pickle; import quant_app.realtime_model; m=pickle.load(open('Low_conf.pkl','rb')); print(type(m).__name__); print(m.available_horizons())"
+python -c "import pickle; import quant_app.realtime_model; m=pickle.load(open('models/feature_selected_realtime_model.pkl','rb')); print(type(m).__name__); print(m.available_horizons())"
 ```
 
 Upbit 공개 API 확인:

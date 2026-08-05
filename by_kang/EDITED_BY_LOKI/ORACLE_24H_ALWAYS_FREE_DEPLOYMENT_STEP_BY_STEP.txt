@@ -51,7 +51,7 @@ Oracle 공식 문서 기준:
 앱은 서버에서 다음 일을 합니다.
 
 1. Flask API를 8000번 포트로 실행합니다.
-2. `Low_conf.pkl` 모델을 로드합니다.
+2. `models/feature_selected_realtime_model.pkl` 모델을 로드합니다.
 3. `ccxt`로 업비트 1분봉 OHLCV 데이터를 가져옵니다.
 4. `quant_app/realtime_model.py`로 실시간 피처를 만듭니다.
 5. `model.predict_signal(..., horizon="short_30m")`로 추론합니다.
@@ -700,7 +700,7 @@ Oracle 서버에서 압축 풀기:
 필수 파일 확인:
 
    ls -lh
-   ls -lh Low_conf.pkl
+   ls -lh models/feature_selected_realtime_model.pkl
    ls -lh quant_app/realtime_model.py
    ls -lh Dockerfile
 
@@ -716,7 +716,7 @@ Oracle 서버에서 실행합니다.
 
 최소 권장 설정:
 
-   MODEL_FILE=Low_conf.pkl
+   MODEL_FILE=models/feature_selected_realtime_model.pkl
    DEBUG=False
    HOST=0.0.0.0
    PORT=8000
@@ -1018,12 +1018,12 @@ Ampere A1 Always Free 재고가 부족할 수 있습니다.
 
 확인:
 
-   ls -lh Low_conf.pkl
+   ls -lh models/feature_selected_realtime_model.pkl
    ls -lh quant_app/realtime_model.py
 
 컨테이너 안에서 확인:
 
-   docker exec -it quant-trading python -c "import pickle; import quant_app.realtime_model; m=pickle.load(open('Low_conf.pkl','rb')); print(type(m).__name__)"
+   docker exec -it quant-trading python -c "import pickle; import quant_app.realtime_model; m=pickle.load(open('models/feature_selected_realtime_model.pkl','rb')); print(type(m).__name__)"
 
 문제: 업비트 API 호출이 실패합니다.
 

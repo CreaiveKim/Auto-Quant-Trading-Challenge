@@ -8,3 +8,4 @@ SUMMARY.md
 *.key
 *.pub
 *.zip
+reports/feature_generalization_report.ipynb

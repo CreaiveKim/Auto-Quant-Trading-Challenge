@@ -6,17 +6,17 @@ Upbit 1분봉 데이터를 실시간으로 가져와 XGBoost 기반 모델로 �
 
 ## 최적 피처 조합 업데이트
 
-2026-07-03 기준으로 피처 선택 재학습을 수행해 기존 104개 피처를 horizon별 최적 조합으로 축소했습니다. 기본 모델 경로는 `models/feature_selected_realtime_model.pkl`이며, 모델 파일 자체는 GitHub에 올리지 않고 로컬 또는 배포 서버에만 둡니다.
+2026-08-10 기준으로 일반화 점수 기반 재학습과 백테스트를 수행해 기존 104개 피처를 horizon별 최적 조합으로 축소했습니다. 기본 모델 경로는 `models/feature_selected_realtime_model.pkl`이며, 모델 파일 자체는 GitHub에 올리지 않고 로컬 또는 배포 서버에만 둡니다.
 
-| 예측 구간 | 선택 후보 | 피처 수 | 배포 권장 | 요약 |
-| --- | --- | ---: | --- | --- |
-| `short_30m` | `top_32_importance` | 32 | 예 | 단기 실시간 진입 기본 후보 |
-| `short_4h` | `top_24_importance` | 24 | 예 | 중단기 확인용 후보 |
-| `long_2d` | `top_48_importance` | 48 | 예 | 2일 방향성 참고 후보 |
-| `long_30d` | `top_24_importance` | 24 | 아니오 | test 순수익이 음수라 기본 진입에는 비권장 |
-| `long_60d` | 제외 | 0 | 아니오 | 시간순 검증 구간에서 target class가 한쪽으로 쏠려 학습 제외 |
+| 예측 구간 | 선택 후보 | 피처 수 | test AP | test 평균 순수익 | 월/종목 안정성 | 배포 권장 |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| `short_30m` | `top_32_importance` | 32 | 0.5889 | 0.6595% | 100.00% / 100.00% | 예 |
+| `short_4h` | `top_64_importance` | 64 | 0.5191 | 1.5854% | 100.00% / 100.00% | 예 |
+| `long_2d` | `top_48_importance` | 48 | 0.3451 | 1.1017% | 100.00% / 80.00% | 예 |
+| `long_30d` | `top_24_importance` | 24 | 0.1707 | -3.8181% | 50.00% / 16.67% | 아니오 |
+| `long_60d` | 제외 | 0 | - | - | - | 아니오 |
 
-상세 결과는 `reports/feature_selection_report.ipynb`와 `reports/feature_selection_metrics.json`에서 확인합니다.
+선정 기준은 validation 구간의 AP 기준 상승폭, 순수익, 적중률 상승폭, 월별 양수 수익 비율, 종목별 양수 수익 비율, MCC, 피처 수 페널티, 드로다운 페널티를 합산한 일반화 점수입니다. 상세 수치는 `reports/feature_generalization_metrics.json`에 저장하며, 분석용 ipynb 보고서는 로컬의 `reports/feature_generalization_report.ipynb`로 생성합니다.
 
 ## 현재 동작 기준
 

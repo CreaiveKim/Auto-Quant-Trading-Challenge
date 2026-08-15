@@ -92,5 +92,5 @@ LOKI
 - Docker 기반 서버 환경 구축 및 n8n 워크플로우 설계.
 
 KCH
-- 증권사 Open API 연동
+- Binance, UpBit Open API 연동 및 데이터 확보
 - 실시간 데이터/API 연동 보조 및 운영 테스트
